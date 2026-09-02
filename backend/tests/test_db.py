@@ -1,6 +1,9 @@
 import os
 
-os.environ["DATABASE_PATH"] = "/nonexistent/readonly/path/db.sqlite"
+# A path that is unwritable on both POSIX and Windows. On Windows, "<" and ">"
+# are invalid filename characters, so directory creation fails and the module
+# falls back to the in-memory engine.
+os.environ["DATABASE_PATH"] = "/nonexistent/readonly/path/<invalid>/db.sqlite"
 
 import importlib
 
