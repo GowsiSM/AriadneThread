@@ -7,12 +7,14 @@ decisions must be reproducible and explainable, so the "decides" half of
 the "AI proposes, code decides" split lives entirely here. See ai_explainer.py
 for the (optional, non-authoritative) explanation layer.
 
-Composite risk score (0-100) blends five signals:
-  30% cycle involvement       -- closed loops of money (layering pattern)
-  25% community isolation     -- dense internal ties, thin external ties
-  20% PageRank anomaly        -- receiving disproportionate flow vs peers
-  15% temporal burst          -- sudden fan-out shortly after a large inflow
-  10% neighbor propagation    -- risk bleeds from already-flagged neighbors
+Composite risk score (0-100) blends seven signals:
+  25% cycle involvement       -- closed loops of money (layering pattern)
+  22% community isolation     -- dense internal ties, thin external ties
+  18% PageRank anomaly        -- receiving disproportionate flow vs peers
+  12% temporal burst          -- sudden fan-out shortly after a large inflow
+   8% neighbor propagation    -- risk bleeds from already-flagged neighbors
+   8% motif presence          -- structural fraud patterns (fan-in/out/cycle)
+   7% flow concentration      -- how concentrated money flow is within ring
 """
 from __future__ import annotations
 
@@ -26,6 +28,21 @@ try:
     import community as community_louvain  # python-louvain
 except ImportError:  # pragma: no cover
     community_louvain = None
+
+from .graph_intelligence import (
+    compute_member_features,
+    compute_flow_summary,
+    detect_motifs,
+    classify_typology,
+    assign_roles,
+    decompose_ring,
+    MemberFeatures,
+    FlowSummary,
+    MotifMatch,
+    TypologyResult,
+    RoleAssignment,
+    SubRing,
+)
 
 
 @dataclass
@@ -44,6 +61,13 @@ class RingCandidate:
     signals: list[RingSignal]
     formed_at: str | None = None
     key_edges: list[tuple[str, str]] = field(default_factory=list)
+    # --- Stage 3: Graph intelligence fields ---
+    typology: str | None = None
+    typology_confidence: float = 0.0
+    roles: list[RoleAssignment] = field(default_factory=list)
+    flow_summary: FlowSummary | None = None
+    motifs: list[MotifMatch] = field(default_factory=list)
+    sub_rings: list[SubRing] = field(default_factory=list)
 
 
 def _cycle_involvement(g: nx.MultiDiGraph, members: set[str]) -> tuple[float, str]:
@@ -108,7 +132,8 @@ def _temporal_burst(g: nx.MultiDiGraph, members: set[str]) -> tuple[float, str]:
     """Detects a large inflow followed by fast fan-out to many members
     within a short window -- the classic mule-network signature."""
     edges = [
-        (u, v, d) for u, v, d in g.edges(data=True) if u in members or v in members
+        (u, v, d) for u, v, d in g.edges(data=True)
+        if (u in members or v in members) and d.get("ts") is not None
     ]
     if len(edges) < 3:
         return 0.0, "not enough edges"
@@ -165,6 +190,7 @@ def score_candidate(
     directed_g: nx.MultiDiGraph,
     undirected_g: nx.Graph,
     already_flagged: set[str],
+    shared_g: nx.Graph | None = None,
 ) -> RingCandidate:
     cyc_val, cyc_detail = _cycle_involvement(directed_g, members)
     iso_val, iso_detail = _community_isolation(undirected_g, members)
@@ -172,23 +198,60 @@ def score_candidate(
     burst_val, burst_detail = _temporal_burst(directed_g, members)
     prop_val, prop_detail = _neighbor_propagation(undirected_g, members, already_flagged)
 
+    # --- Stage 3: Graph intelligence signals ---
+    member_features = compute_member_features(directed_g, members)
+    flow_summary = compute_flow_summary(directed_g, members)
+    motifs = detect_motifs(directed_g, members, shared_g)
+    typology_result = classify_typology(directed_g, members, motifs, flow_summary, member_features)
+    role_assignments = assign_roles(directed_g, members, flow_summary, motifs)
+
+    # Motif presence signal: count of distinct motif types, normalized
+    # Penalize large communities where motif count naturally inflates
+    distinct_motif_types = len({m.motif_type for m in motifs})
+    n_members = len(members)
+    # Normalize: small rings with motifs are more suspicious than large rings
+    motif_val = min(1.0, distinct_motif_types / 4) * (1.0 / max(1, n_members / 5))
+    motif_detail = f"{distinct_motif_types} distinct motif type(s): {', '.join(sorted({m.motif_type for m in motifs}))}" if motifs else "no motifs detected"
+
+    # Flow concentration signal: how concentrated flow is within the ring
+    # Penalize very large communities where concentration naturally varies
+    flow_val = flow_summary.concentration * (1.0 / max(1, n_members / 5))
+    flow_detail = (
+        f"concentration={flow_summary.concentration:.2f}, "
+        f"inflow={flow_summary.total_inflow:.0f}, "
+        f"outflow={flow_summary.total_outflow:.0f}, "
+        f"internal={flow_summary.internal_volume:.0f}"
+    )
+
     signals = [
-        RingSignal("cycle_involvement", 0.30, cyc_val, cyc_detail),
-        RingSignal("community_isolation", 0.25, iso_val, iso_detail),
-        RingSignal("pagerank_anomaly", 0.20, pr_val, pr_detail),
-        RingSignal("temporal_burst", 0.15, burst_val, burst_detail),
-        RingSignal("neighbor_propagation", 0.10, prop_val, prop_detail),
+        RingSignal("cycle_involvement", 0.25, cyc_val, cyc_detail),
+        RingSignal("community_isolation", 0.22, iso_val, iso_detail),
+        RingSignal("pagerank_anomaly", 0.18, pr_val, pr_detail),
+        RingSignal("temporal_burst", 0.12, burst_val, burst_detail),
+        RingSignal("neighbor_propagation", 0.08, prop_val, prop_detail),
+        RingSignal("motif_presence", 0.08, motif_val, motif_detail),
+        RingSignal("flow_concentration", 0.07, flow_val, flow_detail),
     ]
     score = sum(s.weight * s.value for s in signals) * 100
     key_edges = [
         (u, v) for u, v in undirected_g.edges(members) if u in members and v in members
     ][:15]
+
+    # Ring decomposition for large rings
+    sub_rings = decompose_ring(directed_g, sorted(members), motifs)
+
     return RingCandidate(
         ring_id=f"CAND-{ring_index:03d}",
         members=sorted(members),
         score=round(score, 1),
         signals=signals,
         key_edges=key_edges,
+        typology=typology_result.primary,
+        typology_confidence=typology_result.confidence,
+        roles=role_assignments,
+        flow_summary=flow_summary,
+        motifs=motifs,
+        sub_rings=sub_rings,
     )
 
 
@@ -206,7 +269,10 @@ def run_detection(
     candidates: list[RingCandidate] = []
     for i, members in enumerate(communities):
         combined_view = nx.compose(shared_attr_g, undirected_tx)
-        cand = score_candidate(i, members, directed_g, combined_view, already_flagged)
+        cand = score_candidate(
+            i, members, directed_g, combined_view, already_flagged,
+            shared_g=shared_attr_g,
+        )
         candidates.append(cand)
         if cand.score >= score_threshold:
             already_flagged.update(members)
