@@ -17,6 +17,8 @@ from .ai_explainer import explain_ring
 from .detection import run_detection, RingCandidate
 from .fairness import compute_cohort_fp_stats, compute_blast_radius, precision_recall
 from .graph_engine import TransactionGraph
+from .investigation import CaseManager, CaseStatus, auto_create_cases
+from .versions import DETECTOR_VERSION, DATASET_VERSION, RUN_VERSION, log_versions
 from .websocket_manager import ConnectionManager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -37,6 +39,7 @@ app.add_middleware(
 )
 
 manager = ConnectionManager()
+case_manager = CaseManager()
 
 # ---- global in-process state (fine for an MVP single-worker demo) ----
 users, transactions = data_gen.generate_dataset()
@@ -50,13 +53,43 @@ stream_stats = {"emitted": 0, "total": len(transactions), "started": False, "don
 
 
 def _candidate_to_dict(c: RingCandidate) -> dict:
-    return {
+    d = {
         "ring_id": c.ring_id,
         "members": c.members,
         "score": c.score,
         "signals": [asdict(s) for s in c.signals],
         "key_edges": c.key_edges,
     }
+    # --- Stage 3: graph intelligence fields ---
+    if c.typology is not None:
+        d["typology"] = c.typology
+        d["typology_confidence"] = c.typology_confidence
+    if c.roles:
+        d["roles"] = [asdict(r) for r in c.roles]
+    if c.flow_summary is not None:
+        fs = c.flow_summary
+        d["flow_summary"] = {
+            "total_inflow": fs.total_inflow,
+            "total_outflow": fs.total_outflow,
+            "internal_volume": fs.internal_volume,
+            "external_volume": fs.external_volume,
+            "net_flow": fs.net_flow,
+            "flow_ratio": fs.flow_ratio,
+            "dominant_path": list(fs.dominant_path),
+            "dominant_amount": fs.dominant_amount,
+            "concentration": fs.concentration,
+        }
+    if c.motifs:
+        d["motifs"] = [
+            {"motif_type": m.motif_type, "nodes": list(m.nodes), "evidence": m.evidence, "confidence": m.confidence}
+            for m in c.motifs
+        ]
+    if c.sub_rings:
+        d["sub_rings"] = [
+            {"sub_ring_id": s.sub_ring_id, "members": s.members, "reason": s.reason, "risk_contribution": s.risk_contribution}
+            for s in c.sub_rings
+        ]
+    return d
 
 
 async def _run_detection_and_broadcast():
@@ -86,13 +119,32 @@ async def _run_detection_and_broadcast():
         blast = compute_blast_radius(cand, user_index, tx_value_by_user)
         blast_d = asdict(blast)
         db.save_ring(cd, explanation, blast_d)
-        db.log_audit("ring_flagged", {"ring_id": cand.ring_id, "score": cand.score})
+        db.log_audit("ring_flagged", {
+            "ring_id": cand.ring_id, "score": cand.score,
+            "detector_version": DETECTOR_VERSION.hash,
+        }, ring_id=cand.ring_id)
         await manager.broadcast({
             "type": "ring_alert",
             "ring": cd,
             "explanation": explanation,
             "blast_radius": blast_d,
         })
+
+    # --- Stage 5: auto-create investigation cases ---
+    new_cases = auto_create_cases(
+        case_manager, candidates,
+        score_threshold=SCORE_THRESHOLD,
+        detector_version=DETECTOR_VERSION.hash,
+        dataset_version=DATASET_VERSION.hash,
+    )
+    for case in new_cases:
+        db.save_case(case.to_dict(), [db._serialize_event(e) for e in case.events])
+        db.log_audit("case_created" if len(case.events) == 1 else "case_updated", {
+            "case_id": case.case_id,
+            "ring_id": case.ring_id,
+            "status": case.status.value,
+            "priority": case.priority.value,
+        }, case_id=case.case_id, ring_id=case.ring_id)
 
     await manager.broadcast({
         "type": "metrics_update",
@@ -162,6 +214,160 @@ async def get_metrics():
 @app.get("/api/fairness")
 async def get_fairness():
     return latest_fairness
+
+
+# ---------------------------------------------------------------------------
+# Stage 5: Investigation endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/cases")
+async def get_cases(status: str | None = None):
+    """List investigation cases, optionally filtered by status."""
+    if status:
+        try:
+            status_enum = CaseStatus(status)
+        except ValueError:
+            return {"error": f"invalid status: {status}", "valid": [s.value for s in CaseStatus]}
+        cases = case_manager.list_cases(status=status_enum)
+    else:
+        cases = case_manager.list_cases()
+    return {"cases": [c.to_dict() for c in cases], "summary": case_manager.summary()}
+
+
+@app.get("/api/cases/{case_id}")
+async def get_case(case_id: str):
+    """Get a single case with its full timeline."""
+    case = case_manager.get_case(case_id)
+    if not case:
+        return {"error": "not found"}
+    result = case.to_dict()
+    result["timeline"] = case_manager.get_timeline(case_id)
+    result["evidence"] = case.evidence
+    result["notes"] = case.notes
+    return {"case": result}
+
+
+@app.post("/api/cases/{case_id}/transition")
+async def transition_case(case_id: str, body: dict):
+    """Transition a case to a new status. Body: {"to_status": "...", "actor": "..."}"""
+    to_status_raw = body.get("to_status")
+    actor = body.get("actor", "analyst")
+    if not to_status_raw:
+        return {"error": "to_status is required"}
+    try:
+        to_status = CaseStatus(to_status_raw)
+    except ValueError:
+        return {"error": f"invalid status: {to_status_raw}", "valid": [s.value for s in CaseStatus]}
+
+    try:
+        case = case_manager.transition(case_id, to_status, actor=actor)
+    except KeyError:
+        return {"error": "case not found"}
+    except ValueError as exc:
+        return {"error": str(exc)}
+
+    db.save_case(case.to_dict(), [db._serialize_event(e) for e in case.events])
+    db.log_audit("case_transition", {
+        "case_id": case.case_id, "to_status": to_status.value, "actor": actor,
+    }, case_id=case.case_id, ring_id=case.ring_id)
+    return {"case": case.to_dict()}
+
+
+@app.post("/api/cases/{case_id}/note")
+async def add_case_note(case_id: str, body: dict):
+    """Add a note to a case. Body: {"note": "...", "actor": "..."}"""
+    note = body.get("note")
+    actor = body.get("actor", "analyst")
+    if not note:
+        return {"error": "note is required"}
+    try:
+        event = case_manager.add_note(case_id, note, actor=actor)
+    except KeyError:
+        return {"error": "case not found"}
+
+    case = case_manager.get_case(case_id)
+    db.save_case(case.to_dict(), [db._serialize_event(event)])
+    db.log_audit("case_note", {"case_id": case_id, "actor": actor}, case_id=case_id)
+    return {"case": case.to_dict()}
+
+
+@app.post("/api/cases/{case_id}/assign")
+async def assign_case(case_id: str, body: dict):
+    """Assign a case to an analyst. Body: {"analyst": "..."}"""
+    analyst = body.get("analyst")
+    if not analyst:
+        return {"error": "analyst is required"}
+    try:
+        event = case_manager.assign(case_id, analyst)
+    except KeyError:
+        return {"error": "case not found"}
+
+    case = case_manager.get_case(case_id)
+    db.save_case(case.to_dict(), [db._serialize_event(event)])
+    db.log_audit("case_assigned", {"case_id": case_id, "analyst": analyst}, case_id=case_id)
+    return {"case": case.to_dict()}
+
+
+@app.get("/api/versions")
+async def get_versions():
+    """Return the current detector/dataset/feature/run versions."""
+    return log_versions()
+
+
+@app.get("/api/evaluation")
+async def get_evaluation():
+    """Run full evaluation (threshold sweep + baselines + adversarial) with deterministic seed."""
+    from . import data_gen as _dg
+    from .graph_engine import TransactionGraph
+    from .evaluation import generate_eval_report, threshold_sweep, compare_all_baselines, temporal_split_eval
+    from .adversarial import run_adversarial_tests
+
+    # Generate a fixed dataset for evaluation
+    users, transactions = _dg.generate_dataset(
+        n_background_users=150, n_background_tx=500, n_rings=3, seed=1,
+    )
+    user_index = {u.user_id: u for u in users}
+    tg = TransactionGraph()
+    for tx in transactions:
+        tg.add_transaction(tx)
+
+    directed_g = tg.snapshot()
+    shared_attr_g = tg.shared_attribute_graph(user_index)
+
+    # Run detection for sweep/baselines
+    candidates = run_detection(directed_g, shared_attr_g, score_threshold=55.0)
+    sweep = threshold_sweep(candidates, user_index)
+    baselines = compare_all_baselines(directed_g, shared_attr_g, user_index)
+
+    # Temporal split
+    temporal = None
+    try:
+        temporal = temporal_split_eval(transactions, user_index, score_threshold=55.0)
+    except Exception:
+        pass
+
+    # Adversarial robustness
+    adversarial = None
+    try:
+        adversarial = run_adversarial_tests(seed=42, threshold=55.0)
+    except Exception:
+        pass
+
+    # Serialize results
+    def _to_dict(obj):
+        from dataclasses import asdict as _asdict
+        return _asdict(obj)
+
+    return {
+        "threshold_sweep": _to_dict(sweep),
+        "baselines": [_to_dict(b) for b in baselines],
+        "temporal_split": _to_dict(temporal) if temporal else None,
+        "adversarial": _to_dict(adversarial) if adversarial else None,
+        "current_threshold": SCORE_THRESHOLD,
+        "current_rings": [_candidate_to_dict(c) for c in candidates],
+        "n_users": len(user_index),
+        "n_transactions": len(transactions),
+    }
 
 
 @app.get("/api/users/{user_id}")
