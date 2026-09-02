@@ -502,7 +502,7 @@ def classify_typology(
     # --- Flow signals ---
     if flow.concentration > 0.6:
         scores["fan_in"] += 0.15
-        scores["collector"] += 0.15
+        scores["funnel"] += 0.10
         evidence.append(f"High flow concentration ({flow.concentration:.2f})")
 
     if flow.flow_ratio > 0.5:
