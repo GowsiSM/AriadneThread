@@ -26,7 +26,7 @@
   --ring-link-flagged: #f97316;
   --ring-node: #38bdf8;
   --ring-node-flagged: #ef4444;
-  --ring-node-glow: rgba(239, 68, 68, 0.25);
+  --ring-node-glow: rgba(239, 68, 68, 0.3);
   --graph-bg: #f5f5f5;
   --signal-bar: #3b82f6;
   --signal-bar-bg: #e5e5e5;
@@ -55,11 +55,11 @@
   --info: #3b82f6;
   --neutral: #737373;
   --ring-bg: #111111;
-  --ring-link: #2a2f3a;
-  --ring-link-flagged: #f97316;
+  --ring-link: #4a5568;
+  --ring-link-flagged: #fb923c;
   --ring-node: #38bdf8;
-  --ring-node-flagged: #ef4444;
-  --ring-node-glow: rgba(239, 68, 68, 0.35);
+  --ring-node-flagged: #f87171;
+  --ring-node-glow: rgba(248, 113, 113, 0.4);
   --graph-bg: #0d0d0d;
   --signal-bar: #3b82f6;
   --signal-bar-bg: #262626;
