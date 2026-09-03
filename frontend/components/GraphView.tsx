@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   forceSimulation,
   forceLink,
@@ -9,7 +10,6 @@ import {
   forceCollide,
   type SimulationNodeDatum,
   type SimulationLinkDatum,
-  type Simulation,
 } from "d3-force";
 import type { TxMessage, RingAlert } from "@/lib/types";
 
@@ -32,11 +32,12 @@ export default function GraphView({
   recentTx: TxMessage[];
   alerts: RingAlert[];
 }) {
+  const router = useRouter();
   const [nodes, setNodes] = useState<GNode[]>([]);
   const [links, setLinks] = useState<GLink[]>([]);
-  const simRef = useRef<Simulation<GNode, GLink> | null>(null);
   const nodesRef = useRef<Map<string, GNode>>(new Map());
   const linksRef = useRef<Map<string, GLink>>(new Map());
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const flaggedMembers = new Set(alerts.flatMap((a) => a.ring.members));
 
@@ -72,34 +73,52 @@ export default function GraphView({
     const nodeArr = Array.from(nMap.values());
     const linkArr = Array.from(lMap.values());
 
-    if (!simRef.current) {
-      simRef.current = forceSimulation<GNode>(nodeArr)
-        .force("charge", forceManyBody().strength(-60))
-        .force("center", forceCenter(WIDTH / 2, HEIGHT / 2))
-        .force("collide", forceCollide(14))
-        .force(
-          "link",
-          forceLink<GNode, GLink>(linkArr)
-            .id((d) => d.id)
-            .distance(46)
-            .strength(0.25)
-        )
-        .alpha(0.6)
-        .on("tick", () => {
-          setNodes([...nodeArr]);
-          setLinks([...linkArr]);
-        });
-    } else {
-      simRef.current.nodes(nodeArr);
-      (simRef.current.force("link") as ReturnType<typeof forceLink<GNode, GLink>>).links(linkArr);
-      simRef.current.alpha(0.5).restart();
+    // Stop any previous timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
+
+    // Create simulation but immediately stop it — we drive the tick manually
+    // to avoid relying on requestAnimationFrame which may not fire.
+    const sim = forceSimulation<GNode>(nodeArr)
+      .force("charge", forceManyBody().strength(-60))
+      .force("center", forceCenter(WIDTH / 2, HEIGHT / 2))
+      .force("collide", forceCollide(14))
+      .force(
+        "link",
+        forceLink<GNode, GLink>(linkArr)
+          .id((d) => d.id)
+          .distance(46)
+          .strength(0.25)
+      )
+      .alpha(0.8)
+      .stop();
+
+    // Manually tick the simulation via setInterval, which is more reliable than
+    // requestAnimationFrame in SSR/dev environments.
+    let tickCount = 0;
+    timerRef.current = setInterval(() => {
+      if (sim.alpha() < sim.alphaMin() || tickCount > 120) {
+        clearInterval(timerRef.current!);
+        timerRef.current = null;
+        return;
+      }
+      sim.tick();
+      tickCount++;
+      setNodes([...nodeArr]);
+      setLinks([...linkArr]);
+    }, 30);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recentTx, alerts]);
 
   useEffect(() => {
     return () => {
-      simRef.current?.stop();
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     };
   }, []);
 
@@ -107,9 +126,21 @@ export default function GraphView({
     <div className="card overflow-hidden">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold text-fg">Live transaction graph</h2>
-        <span className="font-mono text-[11px] text-fg-muted">
-          {nodes.length} nodes · {links.length} edges · cap {MAX_NODES}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-[11px] text-fg-muted">
+            {nodes.length} nodes · {links.length} edges · cap {MAX_NODES}
+          </span>
+          <button
+            onClick={() => router.push("/graph-analysis")}
+            className="flex h-6 w-6 items-center justify-center rounded-md border border-border text-fg-muted transition-colors hover:border-accent hover:text-accent"
+            title="Open graph analysis"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 17L17 7" />
+              <path d="M7 7h10v10" />
+            </svg>
+          </button>
+        </div>
       </div>
       <div className="bg-graph-bg">
         <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="h-[400px] w-full">
@@ -118,6 +149,7 @@ export default function GraphView({
               const s = l.source as GNode;
               const t = l.target as GNode;
               if (typeof s !== "object" || typeof t !== "object" || s.x == null || t.x == null) return null;
+              const flagged = s.flagged || t.flagged;
               return (
                 <line
                   key={l.id}
@@ -125,9 +157,9 @@ export default function GraphView({
                   y1={s.y}
                   x2={t.x}
                   y2={t.y}
-                  className={s.flagged || t.flagged ? "stroke-ring-link-flagged" : "stroke-ring-link"}
-                  strokeWidth={s.flagged || t.flagged ? 1.2 : 0.6}
-                  opacity={0.6}
+                  stroke={flagged ? "var(--ring-link-flagged)" : "var(--ring-link)"}
+                  strokeWidth={flagged ? 1.2 : 0.6}
+                  opacity={flagged ? 0.8 : 0.4}
                 />
               );
             })}
@@ -138,20 +170,20 @@ export default function GraphView({
                     <circle
                       cx={n.x}
                       cy={n.y}
-                      r={10}
+                      r={12}
                       fill="var(--ring-node-glow)"
                     />
                   )}
                   <circle
                     cx={n.x}
                     cy={n.y}
-                    r={n.flagged ? 5 : 3}
-                    className={n.flagged ? "fill-ring-node-flagged" : "fill-ring-node"}
+                    r={n.flagged ? 6 : 3.5}
+                    fill={n.flagged ? "var(--ring-node-flagged)" : "var(--ring-node)"}
                     stroke={n.flagged ? "var(--foreground)" : "none"}
-                    strokeWidth={n.flagged ? 0.8 : 0}
-                    opacity={n.flagged ? 1 : 0.7}
+                    strokeWidth={n.flagged ? 1 : 0}
+                    opacity={n.flagged ? 1 : 0.75}
                   >
-                    <title>{n.id}</title>
+                    <title>{n.id}{n.flagged ? " (flagged)" : ""}</title>
                   </circle>
                 </g>
               )
@@ -161,13 +193,13 @@ export default function GraphView({
       </div>
       <div className="flex items-center gap-4 border-t border-border px-4 py-2 text-[11px] text-fg-muted">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-ring-node-flagged" /> Flagged
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: "var(--ring-node-flagged)" }} /> Flagged
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-ring-node" /> Normal
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: "var(--ring-node)" }} /> Normal
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-0.5 w-3 bg-ring-link-flagged" /> Ring edge
+          <span className="inline-block h-0.5 w-4 rounded" style={{ background: "var(--ring-link-flagged)" }} /> Ring edge
         </span>
       </div>
     </div>
