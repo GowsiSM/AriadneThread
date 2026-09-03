@@ -12,6 +12,7 @@ interface SentinelData {
   cohorts: CohortStat[];
   streamStats: StreamStats | null;
   recentTx: TxMessage[];
+  restartStream: () => Promise<void>;
 }
 
 const SentinelContext = createContext<SentinelData>({
@@ -22,6 +23,7 @@ const SentinelContext = createContext<SentinelData>({
   cohorts: [],
   streamStats: null,
   recentTx: [],
+  restartStream: async () => {},
 });
 
 export function useSentinelData() {

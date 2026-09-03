@@ -43,7 +43,7 @@ export default function StatusBar({
         {streamStats && (
           <span className="text-xs text-fg-muted">
             {streamStats.emitted}/{streamStats.total} txns
-            {streamStats.done ? " ✓" : ""}
+            {streamStats.done ? " ✓ stream completed" : ""}
           </span>
         )}
       </div>

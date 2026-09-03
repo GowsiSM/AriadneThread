@@ -11,6 +11,7 @@ import type {
 } from "./types";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/stream";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MAX_RECONNECT_DELAY_MS = 8000;
 const RECENT_TX_BUFFER = 60;
 
@@ -60,9 +61,12 @@ export function useSentinelSocket() {
           setMetrics(msg.metrics);
           setCohorts(msg.fairness?.cohorts ?? []);
           setStreamStats(msg.stream);
+          if (msg.recent_tx && msg.recent_tx.length > 0) {
+            setRecentTx(msg.recent_tx.slice(0, RECENT_TX_BUFFER));
+          }
           setAlerts(
             msg.rings
-              .filter((r) => r.score >= (msg.metrics?.threshold ?? 55))
+              .filter((r) => r.score >= (msg.metrics?.threshold ?? 40))
               .map((r) => ({
                 ring: r,
                 explanation: { text: "(loaded from snapshot)", source: "template", error: null },
@@ -132,6 +136,22 @@ export function useSentinelSocket() {
     }, delay);
   }, [connect]);
 
+  const restartStream = useCallback(async () => {
+    // Ask the backend to replay the dataset, then reconnect so we catch the
+    // fresh stream from the very first transaction.
+    try {
+      await fetch(`${API_URL}/api/stream/restart`, { method: "POST" });
+    } catch {
+      // If the restart call fails, still try to reconnect below.
+    }
+    setRecentTx([]);
+    setAlerts([]);
+    wsRef.current?.close();
+    attemptRef.current = 0;
+    setReconnectCount(0);
+    connect();
+  }, [connect]);
+
   useEffect(() => {
     mountedRef.current = true;
     connect();
@@ -141,5 +161,5 @@ export function useSentinelSocket() {
     };
   }, [connect]);
 
-  return { connectionState, alerts, metrics, cohorts, streamStats, recentTx, reconnectCount };
+  return { connectionState, alerts, metrics, cohorts, streamStats, recentTx, reconnectCount, restartStream };
 }

@@ -45,7 +45,13 @@ const sections: NavSection[] = [
   },
 ];
 
-export default function Sidebar({ connectionState }: { connectionState: string }) {
+export default function Sidebar({
+  connectionState,
+  streamStats,
+}: {
+  connectionState: string;
+  streamStats?: { done: boolean } | null;
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -55,9 +61,12 @@ export default function Sidebar({ connectionState }: { connectionState: string }
     return pathname.startsWith(href);
   };
 
+  const streamDone = streamStats?.done ?? false;
   const connectionDot =
     connectionState === "open"
-      ? "bg-success"
+      ? streamDone
+        ? "bg-fg-muted"
+        : "bg-success"
       : connectionState === "reconnecting"
         ? "bg-warning"
         : connectionState === "connecting"
@@ -101,7 +110,11 @@ export default function Sidebar({ connectionState }: { connectionState: string }
               </span>
               <span className="flex items-center gap-1.5 text-[10px] text-fg-muted">
                 <span className={`inline-block h-1.5 w-1.5 rounded-full ${connectionDot}`} />
-                {connectionState === "open" ? "Stream active" : connectionState}
+                {connectionState === "open"
+                  ? streamDone
+                    ? "Stream completed"
+                    : "Stream active"
+                  : connectionState}
               </span>
             </div>
           )}

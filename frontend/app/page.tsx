@@ -5,13 +5,14 @@ import PageRouter from "@/components/PageRouter";
 import SentinelDataProvider, { useSentinelData } from "@/lib/SentinelDataProvider";
 
 function AppContent() {
-  const { connectionState, metrics, streamStats } = useSentinelData();
+  const { connectionState, metrics, streamStats, restartStream } = useSentinelData();
 
   return (
     <AppShell
       connectionState={connectionState}
       metrics={metrics}
       streamStats={streamStats}
+      onRestart={restartStream}
     >
       <PageRouter />
     </AppShell>
