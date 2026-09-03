@@ -103,7 +103,9 @@ class TestVersioning:
         assert abs(total - 1.0) < 1e-6
 
     def test_default_threshold_matches_detection(self):
-        assert DEFAULT_THRESHOLD == 55.0
+        # Must match SCORE_THRESHOLD in app/main.py (40.0) so the Versions
+        # page, README metrics table, and the live detector all agree.
+        assert DEFAULT_THRESHOLD == 40.0
 
     def test_enabled_features_nonempty(self):
         assert len(ENABLED_FEATURES) > 0

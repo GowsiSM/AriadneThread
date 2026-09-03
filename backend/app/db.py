@@ -173,27 +173,32 @@ def _serialize_event(event) -> dict:
 
 
 def save_case(case_dict: dict, events: list[dict] | None = None):
-    """Persist an InvestigationCase (dict form) and optional events."""
+    """Persist an InvestigationCase (dict form) and optional events.
+
+    Upserts by the business key ``case_id`` (not the autoincrement PK) so
+    re-saving an existing case never trips the UNIQUE constraint on
+    ``cases.case_id``.
+    """
     session = get_session()
     try:
-        rec = CaseRecord(
-            case_id=case_dict["case_id"],
-            ring_id=case_dict["ring_id"],
-            status=case_dict["status"],
-            priority=case_dict["priority"],
-            created_at=datetime.fromisoformat(case_dict["created_at"]),
-            updated_at=datetime.fromisoformat(case_dict["updated_at"]),
-            members=case_dict["members"],
-            score=case_dict["score"],
-            typology=case_dict.get("typology"),
-            assigned_to=case_dict.get("assigned_to"),
-            notes=case_dict.get("notes", []),
-            evidence=case_dict.get("evidence", []),
-            detector_version=case_dict.get("detector_version", ""),
-            dataset_version=case_dict.get("dataset_version", ""),
-            detection_metadata=case_dict.get("detection_metadata", {}),
-        )
-        session.merge(rec)
+        existing = session.query(CaseRecord).filter_by(case_id=case_dict["case_id"]).first()
+        if existing is None:
+            existing = CaseRecord(case_id=case_dict["case_id"])
+            session.add(existing)
+        existing.ring_id = case_dict["ring_id"]
+        existing.status = case_dict["status"]
+        existing.priority = case_dict["priority"]
+        existing.created_at = datetime.fromisoformat(case_dict["created_at"])
+        existing.updated_at = datetime.fromisoformat(case_dict["updated_at"])
+        existing.members = case_dict["members"]
+        existing.score = case_dict["score"]
+        existing.typology = case_dict.get("typology")
+        existing.assigned_to = case_dict.get("assigned_to")
+        existing.notes = case_dict.get("notes", [])
+        existing.evidence = case_dict.get("evidence", [])
+        existing.detector_version = case_dict.get("detector_version", "")
+        existing.dataset_version = case_dict.get("dataset_version", "")
+        existing.detection_metadata = case_dict.get("detection_metadata", {})
         session.commit()
     except Exception as exc:
         logger.warning("Case save failed: %s", exc)
@@ -207,22 +212,27 @@ def save_case(case_dict: dict, events: list[dict] | None = None):
 
 
 def save_case_event(event_dict: dict):
-    """Persist a single CaseEvent."""
+    """Persist a single CaseEvent.
+
+    Upserts by the business key ``event_id`` (not the autoincrement PK) so
+    re-saving an event that already exists never trips the UNIQUE constraint
+    on ``case_events.event_id``.
+    """
     session = get_session()
     try:
         from_status = event_dict.get("from_status")
         to_status = event_dict.get("to_status")
-        rec = CaseEventRecord(
-            event_id=event_dict["event_id"],
-            case_id=event_dict["case_id"],
-            timestamp=datetime.fromisoformat(event_dict["timestamp"]),
-            event_type=event_dict["event_type"],
-            from_status=from_status.value if hasattr(from_status, "value") else from_status,
-            to_status=to_status.value if hasattr(to_status, "value") else to_status,
-            actor=event_dict.get("actor", "system"),
-            detail=event_dict.get("detail", {}),
-        )
-        session.merge(rec)
+        existing = session.query(CaseEventRecord).filter_by(event_id=event_dict["event_id"]).first()
+        if existing is None:
+            existing = CaseEventRecord(event_id=event_dict["event_id"])
+            session.add(existing)
+        existing.case_id = event_dict["case_id"]
+        existing.timestamp = datetime.fromisoformat(event_dict["timestamp"])
+        existing.event_type = event_dict["event_type"]
+        existing.from_status = from_status.value if hasattr(from_status, "value") else from_status
+        existing.to_status = to_status.value if hasattr(to_status, "value") else to_status
+        existing.actor = event_dict.get("actor", "system")
+        existing.detail = event_dict.get("detail", {})
         session.commit()
     except Exception as exc:
         logger.warning("Case event save failed: %s", exc)

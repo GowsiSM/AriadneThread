@@ -34,7 +34,9 @@ SIGNAL_WEIGHTS: dict[str, float] = {
     "flow_concentration": 0.07,
 }
 
-DEFAULT_THRESHOLD: float = 55.0
+# Must match SCORE_THRESHOLD in app/main.py (40.0). Kept in sync so the
+# Versions page, README metrics table, and the live detector all agree.
+DEFAULT_THRESHOLD: float = 40.0
 
 # Enabled features (must match detection.py + graph_intelligence.py)
 ENABLED_FEATURES: list[str] = [

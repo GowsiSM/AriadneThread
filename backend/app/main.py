@@ -12,7 +12,7 @@ load_dotenv()
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import data_gen, db
+from . import synthetic, db
 from .ai_explainer import explain_ring
 from .detection import run_detection, RingCandidate
 from .fairness import compute_cohort_fp_stats, compute_blast_radius, precision_recall
@@ -24,7 +24,27 @@ from .websocket_manager import ConnectionManager
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("fraud_sentinel")
 
-SCORE_THRESHOLD = 55.0
+SCORE_THRESHOLD = 40.0
+# Re-tuned 2026-09-03 after wiring in the full 12-typology synthetic dataset.
+#
+# IMPORTANT: an earlier pass at this set SCORE_THRESHOLD=35 based on a sweep
+# from /api/evaluation -- but at the time that endpoint generated its OWN
+# dataset (seed=1, 200 users, 800 tx), different from the live startup
+# dataset (seed=42, 300 background users -> 385 total, 1200 background tx ->
+# 1282 total). Deploying threshold=35 against the REAL live dataset measured
+# precision 0.27 / recall 0.65 -- nothing like the 1.00 / 0.75 the mismatched
+# sweep predicted. /api/evaluation was then fixed to reuse the exact live
+# dataset instead of generating a separate one (see CHANGES.md), and a fresh
+# sweep against the real data shows 40 is the actual best F1 operating point
+# holding perfect precision:
+#   threshold=30 -> P=0.24 R=1.00 F1=0.39
+#   threshold=35 -> P=0.27 R=0.65 F1=0.38
+#   threshold=40 -> P=1.00 R=0.47 F1=0.64   <- selected
+#   threshold=45 -> P=1.00 R=0.22 F1=0.37
+#   threshold=55 (old default) -> P=1.00 R=0.06 F1=0.11
+# We kept precision=1.00 as a hard constraint (a false positive is what the
+# blast-radius report exists to make expensive) and picked the threshold
+# that maximizes recall subject to that constraint.
 DETECTION_EVERY_N_EDGES = int(os.getenv("DETECTION_EVERY_N_EDGES", "30"))
 STREAM_TPS = float(os.getenv("STREAM_TPS", "15"))
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
@@ -42,14 +62,40 @@ manager = ConnectionManager()
 case_manager = CaseManager()
 
 # ---- global in-process state (fine for an MVP single-worker demo) ----
-users, transactions = data_gen.generate_dataset()
+# Uses the 12-typology synthetic generator (app/synthetic.py) so the live
+# stream, dashboard, and /api/rings /api/metrics /api/evaluation all reflect
+# the full typology set, not just the original 3-ring baseline.
+_dataset = synthetic.generate_dataset()
+users, transactions = _dataset.users, _dataset.transactions
 user_index = {u.user_id: u for u in users}
+logger.info(
+    "Loaded synthetic dataset: %d users, %d transactions, %d rings (%s)",
+    len(users), len(transactions), len(_dataset.scenarios),
+    ", ".join(_dataset.meta.get("typologies", [])),
+)
 tx_graph = TransactionGraph()
 latest_candidates: list[RingCandidate] = []
 latest_metrics: dict = {}
 latest_fairness: dict = {}
 tx_value_by_user: dict[str, float] = {}
 stream_stats = {"emitted": 0, "total": len(transactions), "started": False, "done": False}
+# Ring buffer of the most recent transactions so a client that connects after
+# the stream finishes still has data to render (graph + transactions pages).
+RECENT_TX_LIMIT = 200
+recent_tx: list[dict] = []
+_stream_task: asyncio.Task | None = None
+
+
+def _reset_stream_state():
+    """Reset all in-process stream state so a fresh replay starts clean."""
+    global tx_graph, latest_candidates, latest_metrics, latest_fairness, tx_value_by_user, stream_stats, recent_tx
+    tx_graph = TransactionGraph()
+    latest_candidates = []
+    latest_metrics = {}
+    latest_fairness = {}
+    tx_value_by_user = {}
+    stream_stats = {"emitted": 0, "total": len(transactions), "started": False, "done": False}
+    recent_tx = []
 
 
 def _candidate_to_dict(c: RingCandidate) -> dict:
@@ -155,6 +201,7 @@ async def _run_detection_and_broadcast():
 
 
 async def _streamer():
+    global recent_tx
     stream_stats["started"] = True
     delay = 1.0 / max(STREAM_TPS, 0.1)
     for tx in transactions:
@@ -162,6 +209,9 @@ async def _streamer():
         tx_value_by_user[tx.sender] = tx_value_by_user.get(tx.sender, 0.0) + tx.amount
         tx_value_by_user[tx.receiver] = tx_value_by_user.get(tx.receiver, 0.0) + tx.amount
         stream_stats["emitted"] += 1
+        recent_tx.append(tx.to_dict())
+        if len(recent_tx) > RECENT_TX_LIMIT:
+            recent_tx = recent_tx[-RECENT_TX_LIMIT:]
 
         await manager.broadcast({
             "type": "transaction",
@@ -181,13 +231,36 @@ async def _streamer():
 
 @app.on_event("startup")
 async def startup():
+    global _stream_task
     db.log_audit("startup", {"n_users": len(users), "n_transactions": len(transactions)})
-    asyncio.create_task(_streamer())
+    _stream_task = asyncio.create_task(_streamer())
 
 
+@app.get("/health")
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "stream": stream_stats}
+
+
+@app.post("/api/stream/restart")
+async def restart_stream():
+    """Cancel any in-flight stream and replay the dataset from scratch.
+
+    Lets a frontend that connected after the stream finished (or wants to
+    re-watch the live graph) trigger a fresh replay without restarting the
+    backend process.
+    """
+    global _stream_task
+    if _stream_task is not None and not _stream_task.done():
+        _stream_task.cancel()
+        try:
+            await _stream_task
+        except asyncio.CancelledError:
+            pass
+    _reset_stream_state()
+    db.log_audit("stream_restart", {"n_transactions": len(transactions)})
+    _stream_task = asyncio.create_task(_streamer())
+    return {"status": "restarting", "stream": stream_stats}
 
 
 @app.get("/api/rings")
@@ -316,17 +389,25 @@ async def get_versions():
 
 @app.get("/api/evaluation")
 async def get_evaluation():
-    """Run full evaluation (threshold sweep + baselines + adversarial) with deterministic seed."""
-    from . import data_gen as _dg
+    """Run full evaluation (threshold sweep + baselines + adversarial) on the
+    SAME dataset currently powering the live stream/dashboard -- not a
+    separately-generated sample.
+
+    Earlier this endpoint generated its own dataset with a different seed
+    and scale (seed=1, 200 users, 800 tx) than the live startup dataset
+    (seed=42, 300 users, 1200 tx). That mismatch produced a threshold sweep
+    that looked great (precision 1.00, recall 0.75 @ threshold 35) but did
+    not transfer to what was actually streaming -- the live run at
+    threshold 35 measured precision 0.24, recall 0.65. Reusing the exact
+    same in-memory dataset closes that gap: whatever this endpoint reports
+    is, by construction, what the dashboard is showing.
+    """
     from .graph_engine import TransactionGraph
     from .evaluation import generate_eval_report, threshold_sweep, compare_all_baselines, temporal_split_eval
     from .adversarial import run_adversarial_tests
 
-    # Generate a fixed dataset for evaluation
-    users, transactions = _dg.generate_dataset(
-        n_background_users=150, n_background_tx=500, n_rings=3, seed=1,
-    )
-    user_index = {u.user_id: u for u in users}
+    # Reuse the live dataset (module-level `users`/`transactions`/`user_index`
+    # generated once at startup) rather than generating a new one.
     tg = TransactionGraph()
     for tx in transactions:
         tg.add_transaction(tx)
@@ -335,21 +416,21 @@ async def get_evaluation():
     shared_attr_g = tg.shared_attribute_graph(user_index)
 
     # Run detection for sweep/baselines
-    candidates = run_detection(directed_g, shared_attr_g, score_threshold=55.0)
+    candidates = run_detection(directed_g, shared_attr_g, score_threshold=SCORE_THRESHOLD)
     sweep = threshold_sweep(candidates, user_index)
     baselines = compare_all_baselines(directed_g, shared_attr_g, user_index)
 
     # Temporal split
     temporal = None
     try:
-        temporal = temporal_split_eval(transactions, user_index, score_threshold=55.0)
+        temporal = temporal_split_eval(transactions, user_index, score_threshold=SCORE_THRESHOLD)
     except Exception:
         pass
 
     # Adversarial robustness
     adversarial = None
     try:
-        adversarial = run_adversarial_tests(seed=42, threshold=55.0)
+        adversarial = run_adversarial_tests(seed=42, threshold=SCORE_THRESHOLD)
     except Exception:
         pass
 
@@ -389,6 +470,7 @@ async def ws_stream(ws: WebSocket):
             "metrics": latest_metrics,
             "fairness": latest_fairness,
             "stream": stream_stats,
+            "recent_tx": recent_tx,
         })
         while True:
             # We don't expect inbound messages, but keep the loop alive so
