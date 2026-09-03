@@ -6,6 +6,7 @@ import RingsPage from "@/components/pages/RingsPage";
 import RingDetailPage from "@/components/pages/RingDetailPage";
 import TransactionsPage from "@/components/pages/TransactionsPage";
 import GraphPage from "@/components/pages/GraphPage";
+import GraphAnalysisPage from "@/components/pages/GraphAnalysisPage";
 import FairnessPage from "@/components/pages/FairnessPage";
 import MetricsPage from "@/components/pages/MetricsPage";
 import InvestigationPage from "@/components/pages/InvestigationPage";
@@ -30,6 +31,8 @@ export default function PageRouter() {
       return <TransactionsPage recentTx={data.recentTx} alerts={data.alerts} />;
     case "/graph":
       return <GraphPage recentTx={data.recentTx} alerts={data.alerts} />;
+    case "/graph-analysis":
+      return <GraphAnalysisPage recentTx={data.recentTx} alerts={data.alerts} />;
     case "/fairness":
       return <FairnessPage cohorts={data.cohorts} />;
     case "/metrics":

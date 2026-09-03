@@ -30,7 +30,7 @@ const sections: NavSection[] = [
   {
     title: "Analysis",
     items: [
-      { label: "Graph Analysis", href: "/graph", icon: "◇" },
+      { label: "Graph Analysis", href: "/graph-analysis", icon: "◇" },
       { label: "Fairness Audit", href: "/fairness", icon: "⊞" },
       { label: "Metrics", href: "/metrics", icon: "⊿" },
     ],
