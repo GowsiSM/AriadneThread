@@ -29,32 +29,77 @@ export function useSentinelSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const attemptRef = useRef(0);
   const mountedRef = useRef(true);
+  const connectIdRef = useRef(0);
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectRef = useRef<() => void>(() => {});
 
-  const connect = useCallback(() => {
+  const teardown = useCallback(() => {
+    if (pendingTimerRef.current) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
+    }
+    if (wsRef.current) {
+      wsRef.current.onopen = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+        wsRef.current.close();
+      }
+      wsRef.current = null;
+    }
+  }, []);
+
+  const scheduleReconnect = useCallback(() => {
     if (!mountedRef.current) return;
+    setConnectionState("reconnecting");
+    const attempt = attemptRef.current + 1;
+    attemptRef.current = attempt;
+    setReconnectCount(attempt);
+    const delay = Math.min(500 * 2 ** attempt, MAX_RECONNECT_DELAY_MS);
+    setTimeout(() => {
+      if (mountedRef.current) connectRef.current();
+    }, delay);
+  }, []);
+
+  const openSocket = useCallback((id: number) => {
+    if (!mountedRef.current || id !== connectIdRef.current) return;
+
+    if (wsRef.current) {
+      wsRef.current.onopen = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+        wsRef.current.close();
+      }
+      wsRef.current = null;
+    }
+
     setConnectionState((prev) => (prev === "open" ? prev : "connecting"));
 
     let ws: WebSocket;
     try {
       ws = new WebSocket(WS_URL);
-    } catch (err) {
-      // WebSocket constructor can throw synchronously on malformed URLs etc.
-      scheduleReconnect();
+    } catch {
+      if (id === connectIdRef.current) scheduleReconnect();
       return;
     }
     wsRef.current = ws;
 
     ws.onopen = () => {
+      if (id !== connectIdRef.current) return;
       attemptRef.current = 0;
       setConnectionState("open");
     };
 
     ws.onmessage = (event) => {
+      if (id !== connectIdRef.current) return;
       let msg: ServerMessage;
       try {
         msg = JSON.parse(event.data);
       } catch {
-        return; // ignore malformed frames rather than crashing the UI
+        return;
       }
       switch (msg.type) {
         case "snapshot": {
@@ -114,31 +159,37 @@ export function useSentinelSocket() {
 
     ws.onclose = () => {
       wsRef.current = null;
+      if (id !== connectIdRef.current) return;
       if (!mountedRef.current) return;
       scheduleReconnect();
     };
 
     ws.onerror = () => {
-      // onclose will also fire; avoid double scheduling by letting onclose drive it.
-      ws.close();
+      // Browser fires onclose after onerror — that drives reconnection.
     };
-  }, []);
+  }, [scheduleReconnect]);
 
-  const scheduleReconnect = useCallback(() => {
+  const connect = useCallback(() => {
     if (!mountedRef.current) return;
-    setConnectionState("reconnecting");
-    const attempt = attemptRef.current + 1;
-    attemptRef.current = attempt;
-    setReconnectCount(attempt);
-    const delay = Math.min(500 * 2 ** attempt, MAX_RECONNECT_DELAY_MS);
-    setTimeout(() => {
-      if (mountedRef.current) connect();
-    }, delay);
-  }, [connect]);
+
+    teardown();
+
+    const id = ++connectIdRef.current;
+
+    // Debounce: wait a tick before opening the socket. In React StrictMode the
+    // effect runs → cleanup → runs again. The cleanup clears pendingTimerRef,
+    // so only the second mount's timer fires and actually creates the socket.
+    pendingTimerRef.current = setTimeout(() => {
+      pendingTimerRef.current = null;
+      openSocket(id);
+    }, 0);
+  }, [teardown, openSocket]);
+
+  // Keep connectRef in sync so scheduleReconnect can call latest connect.
+  // Safe as a render-time ref mutation (no re-render triggered).
+  connectRef.current = connect; // eslint-disable-line react-hooks/exhaustive-deps
 
   const restartStream = useCallback(async () => {
-    // Ask the backend to replay the dataset, then reconnect so we catch the
-    // fresh stream from the very first transaction.
     try {
       await fetch(`${API_URL}/api/stream/restart`, { method: "POST" });
     } catch {
@@ -146,20 +197,20 @@ export function useSentinelSocket() {
     }
     setRecentTx([]);
     setAlerts([]);
-    wsRef.current?.close();
+    teardown();
     attemptRef.current = 0;
     setReconnectCount(0);
-    connect();
-  }, [connect]);
+    connectRef.current();
+  }, [teardown]);
 
   useEffect(() => {
     mountedRef.current = true;
-    connect();
+    connectRef.current();
     return () => {
       mountedRef.current = false;
-      wsRef.current?.close();
+      teardown();
     };
-  }, [connect]);
+  }, [teardown]);
 
   return { connectionState, alerts, metrics, cohorts, streamStats, recentTx, reconnectCount, restartStream };
 }
