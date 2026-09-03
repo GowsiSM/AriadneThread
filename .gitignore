@@ -6,6 +6,10 @@ venv/
 backend/data/
 *.db
 
+# Generated datasets (too large for Git)
+data/raw/
+data/processed/
+
 # Node
 node_modules/
 .next/
