@@ -8,6 +8,9 @@ import TransactionsPage from "@/components/pages/TransactionsPage";
 import GraphPage from "@/components/pages/GraphPage";
 import FairnessPage from "@/components/pages/FairnessPage";
 import MetricsPage from "@/components/pages/MetricsPage";
+import InvestigationPage from "@/components/pages/InvestigationPage";
+import EvaluationPage from "@/components/pages/EvaluationPage";
+import VersionsPage from "@/components/pages/VersionsPage";
 import { useSentinelData } from "@/lib/SentinelDataProvider";
 
 export default function PageRouter() {
@@ -31,6 +34,12 @@ export default function PageRouter() {
       return <FairnessPage cohorts={data.cohorts} />;
     case "/metrics":
       return <MetricsPage metrics={data.metrics} />;
+    case "/investigation":
+      return <InvestigationPage />;
+    case "/evaluation":
+      return <EvaluationPage />;
+    case "/versions":
+      return <VersionsPage />;
     default:
       return (
         <DashboardPage

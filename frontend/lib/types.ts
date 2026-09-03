@@ -11,6 +11,46 @@ export interface RingPayload {
   score: number;
   signals: TxSignal[];
   key_edges: [string, string][];
+  // Stage 3: graph intelligence fields
+  typology?: string;
+  typology_confidence?: number;
+  roles?: RoleAssignment[];
+  flow_summary?: FlowSummary;
+  motifs?: MotifMatch[];
+  sub_rings?: SubRing[];
+}
+
+export interface RoleAssignment {
+  user_id: string;
+  role: string;
+  confidence: number;
+  evidence: string;
+}
+
+export interface FlowSummary {
+  total_inflow: number;
+  total_outflow: number;
+  internal_volume: number;
+  external_volume: number;
+  net_flow: number;
+  flow_ratio: number;
+  dominant_path: string[];
+  dominant_amount: number;
+  concentration: number;
+}
+
+export interface MotifMatch {
+  motif_type: string;
+  nodes: string[];
+  evidence: string;
+  confidence: number;
+}
+
+export interface SubRing {
+  sub_ring_id: string;
+  members: string[];
+  reason: string;
+  risk_contribution: number;
 }
 
 export interface Explanation {
@@ -81,4 +121,72 @@ export interface RingAlert {
   explanation: Explanation;
   blast_radius: BlastRadius;
   receivedAt: number;
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5: Investigation cases
+// ---------------------------------------------------------------------------
+
+export type CaseStatus =
+  | "OBSERVED"
+  | "SUSPICIOUS"
+  | "HIGH_RISK"
+  | "UNDER_REVIEW"
+  | "CONFIRMED"
+  | "DISMISSED"
+  | "RESOLVED";
+
+export type CasePriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+export interface CaseEvent {
+  event_id: string;
+  case_id: string;
+  timestamp: string;
+  event_type: string;
+  from_status: CaseStatus | null;
+  to_status: CaseStatus | null;
+  actor: string;
+  detail: Record<string, unknown>;
+}
+
+export interface InvestigationCase {
+  case_id: string;
+  ring_id: string;
+  status: CaseStatus;
+  priority: CasePriority;
+  created_at: string;
+  updated_at: string;
+  members: string[];
+  score: number;
+  typology: string | null;
+  assigned_to: string | null;
+  notes: string[];
+  evidence: Record<string, unknown>[];
+  n_events: number;
+  detector_version: string;
+  dataset_version: string;
+  timeline?: CaseEvent[];
+}
+
+export interface CaseSummary {
+  total_cases: number;
+  by_status: Record<string, number>;
+  by_priority: Record<string, number>;
+  open_cases: number;
+  closed_cases: number;
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5: Versions
+// ---------------------------------------------------------------------------
+
+export interface VersionInfo {
+  detector_version: string;
+  dataset_version: string;
+  feature_version: string;
+  run_version: string;
+  signal_weights: Record<string, number>;
+  threshold: number;
+  features: string[];
+  dataset_config: Record<string, number>;
 }

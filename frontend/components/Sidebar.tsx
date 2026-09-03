@@ -35,6 +35,14 @@ const sections: NavSection[] = [
       { label: "Metrics", href: "/metrics", icon: "⊿" },
     ],
   },
+  {
+    title: "Operations",
+    items: [
+      { label: "Investigations", href: "/investigation", icon: "◫" },
+      { label: "Evaluation", href: "/evaluation", icon: "▤" },
+      { label: "Versions", href: "/versions", icon: "⌬" },
+    ],
+  },
 ];
 
 export default function Sidebar({ connectionState }: { connectionState: string }) {
