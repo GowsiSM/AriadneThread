@@ -32,7 +32,7 @@ export default function TransactionsPage({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-fg-muted">
+                <tr className="border-b border-border text-left font-mono text-[11px] uppercase tracking-wider text-fg-muted">
                   <th className="px-4 py-3 font-medium">Tx ID</th>
                   <th className="px-4 py-3 font-medium">Sender</th>
                   <th className="px-4 py-3 font-medium">Receiver</th>
@@ -51,18 +51,18 @@ export default function TransactionsPage({
                         isFlagged ? "bg-danger/5" : ""
                       }`}
                     >
-                      <td className="px-4 py-2.5 font-mono text-xs text-fg-secondary">{tx.tx_id}</td>
-                      <td className="px-4 py-2.5 font-mono text-xs">
+                      <td className="px-4 py-2.5 mono-data text-xs text-fg-secondary">{tx.tx_id}</td>
+                      <td className="px-4 py-2.5 mono-data text-xs">
                         <span className={flaggedIds.has(tx.sender) ? "text-danger" : "text-fg-secondary"}>
                           {tx.sender}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-xs">
+                      <td className="px-4 py-2.5 mono-data text-xs">
                         <span className={flaggedIds.has(tx.receiver) ? "text-danger" : "text-fg-secondary"}>
                           {tx.receiver}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-right font-mono text-xs text-fg">
+                      <td className="px-4 py-2.5 text-right mono-data text-xs text-fg">
                         ₹{tx.amount.toLocaleString("en-IN")}
                       </td>
                       <td className="px-4 py-2.5">
@@ -76,7 +76,7 @@ export default function TransactionsPage({
                           </StatusBadge>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-fg-muted">
+                      <td className="px-4 py-2.5 mono-data text-xs text-fg-muted">
                         {new Date(tx.ts).toLocaleTimeString()}
                       </td>
                     </tr>

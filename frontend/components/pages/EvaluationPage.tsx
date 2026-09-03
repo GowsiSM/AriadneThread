@@ -67,11 +67,11 @@ function MetricCard({
 }) {
   return (
     <div className="card px-4 py-3">
-      <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+          <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
         {label}
       </div>
       <div
-        className={`mt-0.5 font-mono text-lg font-semibold ${variant ? `text-${variant}` : "text-fg"}`}
+            className={`mt-0.5 font-mono text-lg font-semibold tabular-nums ${variant ? `text-${variant}` : "text-fg"}`}
       >
         {value}
       </div>
@@ -175,13 +175,13 @@ export default function EvaluationPage() {
 
       {/* Threshold sweep */}
       <div className="card p-4">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-muted">
+        <h3 className="mb-3 font-mono text-xs font-semibold uppercase tracking-wider text-fg-muted">
           Threshold Sweep
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-border text-fg-muted">
+              <tr className="border-b border-border font-mono text-[11px] uppercase tracking-wider text-fg-muted">
                 <th className="px-2 py-1.5 text-left font-medium">Threshold</th>
                 <th className="px-2 py-1.5 text-right font-medium">
                   Precision
@@ -232,13 +232,13 @@ export default function EvaluationPage() {
 
       {/* Baselines */}
       <div className="card p-4">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-muted">
+        <h3 className="mb-3 font-mono text-xs font-semibold uppercase tracking-wider text-fg-muted">
           Baseline Comparison
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-border text-fg-muted">
+              <tr className="border-b border-border font-mono text-[11px] uppercase tracking-wider text-fg-muted">
                 <th className="px-2 py-1.5 text-left font-medium">Method</th>
                 <th className="px-2 py-1.5 text-right font-medium">
                   Precision
@@ -284,32 +284,32 @@ export default function EvaluationPage() {
       {/* Temporal split */}
       {temporal_split && (
         <div className="card p-4">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-muted">
+          <h3 className="mb-3 font-mono text-xs font-semibold uppercase tracking-wider text-fg-muted">
             Temporal Split
           </h3>
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-lg bg-surface-subtle p-3">
-              <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+                          <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Train F1
               </div>
-              <div className="mt-0.5 font-mono text-lg font-semibold text-fg">
+                          <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-fg">
                 {(temporal_split.train_metrics.f1 ?? 0).toFixed(3)}
               </div>
             </div>
             <div className="rounded-lg bg-surface-subtle p-3">
-              <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+                          <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Test F1
               </div>
-              <div className="mt-0.5 font-mono text-lg font-semibold text-fg">
+                          <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-fg">
                 {(temporal_split.test_metrics.f1 ?? 0).toFixed(3)}
               </div>
             </div>
             <div className="rounded-lg bg-surface-subtle p-3">
-              <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+                          <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Decay rate
               </div>
               <div
-                className={`mt-0.5 font-mono text-lg font-semibold ${temporal_split.decay_rate < 0.1 ? "text-success" : "text-warning"}`}
+                            className={`mt-0.5 font-mono text-lg font-semibold tabular-nums ${temporal_split.decay_rate < 0.1 ? "text-success" : "text-warning"}`}
               >
                 {(temporal_split.decay_rate * 100).toFixed(1)}%
               </div>
@@ -321,39 +321,39 @@ export default function EvaluationPage() {
       {/* Adversarial robustness */}
       {adversarial && (
         <div className="card p-4">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-muted">
+          <h3 className="mb-3 font-mono text-xs font-semibold uppercase tracking-wider text-fg-muted">
             Adversarial Robustness
           </h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
             <div className="rounded-lg bg-surface-subtle p-3">
-              <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Avg score drop
               </div>
-              <div className="mt-0.5 font-mono text-lg font-semibold text-warning">
+                        <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-warning">
                 {adversarial.avg_score_drop.toFixed(1)}
               </div>
             </div>
             <div className="rounded-lg bg-surface-subtle p-3">
-              <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Max score drop
               </div>
-              <div className="mt-0.5 font-mono text-lg font-semibold text-danger">
+                        <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-danger">
                 {adversarial.max_score_drop.toFixed(1)}
               </div>
             </div>
             <div className="rounded-lg bg-surface-subtle p-3">
-              <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Worst evasion
               </div>
-              <div className="mt-0.5 text-sm text-fg-secondary">
+                        <div className="mt-0.5 font-mono text-sm text-fg-secondary">
                 {adversarial.worst_evasion}
               </div>
             </div>
             <div className="rounded-lg bg-surface-subtle p-3">
-              <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+                        <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Best robustness
               </div>
-              <div className="mt-0.5 text-sm text-fg-secondary">
+                        <div className="mt-0.5 font-mono text-sm text-fg-secondary">
                 {adversarial.best_robustness}
               </div>
             </div>
@@ -362,7 +362,7 @@ export default function EvaluationPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-border text-fg-muted">
+                <tr className="border-b border-border font-mono text-[11px] uppercase tracking-wider text-fg-muted">
                   <th className="px-2 py-1.5 text-left font-medium">
                     Variation
                   </th>
@@ -411,7 +411,7 @@ export default function EvaluationPage() {
 
       {/* Dataset info */}
       <div className="card p-4">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-muted">
+        <h3 className="mb-3 font-mono text-xs font-semibold uppercase tracking-wider text-fg-muted">
           Evaluation Dataset
         </h3>
         <div className="flex gap-4 text-xs text-fg-secondary">
