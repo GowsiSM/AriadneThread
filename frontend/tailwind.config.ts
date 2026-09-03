@@ -42,8 +42,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["Inter", "Geist", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
-        mono: ["Geist Mono", "ui-monospace", "SFMono-Regular", "monospace"],
+        sans: ["var(--font-sans)", "Inter", "Geist", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        mono: ["var(--font-mono)", "JetBrains Mono", "Fira Code", "Geist Mono", "ui-monospace", "monospace"],
       },
       borderRadius: {
         sm: "6px",
