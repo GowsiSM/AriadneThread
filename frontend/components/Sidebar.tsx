@@ -105,10 +105,10 @@ export default function Sidebar({
           </span>
           {!collapsed && (
             <div className="flex flex-col overflow-hidden">
-              <span className="text-sm font-semibold tracking-tight text-fg">
+              <span className="font-sans text-sm font-bold tracking-tight text-fg">
                 Fraud Sentinel
               </span>
-              <span className="flex items-center gap-1.5 text-[10px] text-fg-muted">
+              <span className="flex items-center gap-1.5 font-mono text-[10px] tracking-wide text-fg-muted">
                 <span className={`inline-block h-1.5 w-1.5 rounded-full ${connectionDot}`} />
                 {connectionState === "open"
                   ? streamDone
@@ -125,7 +125,7 @@ export default function Sidebar({
           {sections.map((section) => (
             <div key={section.title} className="mb-3">
               {!collapsed && (
-                <div className="mb-1 px-2 text-[10px] font-medium uppercase tracking-wider text-fg-muted">
+                <div className="mb-1 px-2 font-mono text-[10px] font-medium uppercase tracking-wider text-fg-muted">
                   {section.title}
                 </div>
               )}
@@ -137,10 +137,10 @@ export default function Sidebar({
                       key={item.href}
                       href={item.href}
                       onClick={() => setMobileOpen(false)}
-                      className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors ${
+                      className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 font-sans text-sm transition-colors ${
                         active
-                          ? "bg-surface-subtle text-fg"
-                          : "text-fg-secondary hover:bg-surface-hover hover:text-fg"
+                          ? "bg-surface-subtle font-medium text-fg"
+                          : "font-normal text-fg-secondary hover:bg-surface-hover hover:text-fg"
                       }`}
                     >
                       <span
