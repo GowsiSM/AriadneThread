@@ -81,12 +81,21 @@ backward-compatible tests.
 ## Generation
 
 ```bash
-# Generate default dataset (deterministic seed)
+# 1. Generate the synthetic fraud-ring dataset (required first)
 python scripts/generate_synthetic_fraud.py
+
+# 2. Generate chargeback cases (depends on step 1 output)
+python scripts/generate_chargebacks.py
 
 # Custom size and seed
 python scripts/generate_synthetic_fraud.py --size 500 --seed 42
 ```
+
+Both scripts use the same default seed as the live app's
+`synthetic.generate_dataset()`, so the offline chargeback data matches the
+in-memory dataset generated at runtime. The chargeback script reads from
+`data/processed/transactions.csv` produced by step 1 — always run them in
+order.
 
 ### Output Files (in `data/processed/`)
 

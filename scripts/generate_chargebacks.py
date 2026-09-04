@@ -28,7 +28,7 @@ from __future__ import annotations
 import csv
 import os
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ROOT, "data")
@@ -128,7 +128,7 @@ def main() -> None:
             else:
                 priority = "LOW"
 
-            filed_at = datetime.utcnow() - timedelta(days=rng.randint(0, 30))
+            filed_at = datetime.now(timezone.utc) - timedelta(days=rng.randint(0, 30))
             writer.writerow({
                 "case_id": f"CB-{i:04d}",
                 "transaction_id": tx.get("tx_id", ""),

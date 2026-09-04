@@ -198,6 +198,11 @@ export interface ChargebackCase {
   priority: ChargebackPriority;
   is_fraud: boolean;
   notes?: Record<string, unknown>[];
+  ml_risk?: {
+    risk_score: number | null;
+    risk_level: "LOW" | "MEDIUM" | "HIGH" | "unknown";
+    available: boolean;
+  };
 }
 
 export interface EvidenceItem {
@@ -207,6 +212,8 @@ export interface EvidenceItem {
   value: unknown;
   strength: number;
   collected_at: string;
+  top_priority?: boolean;
+  reason_code?: string;
 }
 
 export interface ChargebackResponse {
@@ -217,6 +224,13 @@ export interface ChargebackResponse {
   evidence: EvidenceItem[];
   evidence_strength: number;
   generated_at: string;
+  rationale?: {
+    reason: string;
+    driving_categories: string[];
+    category_scores: Record<string, number>;
+    reason_score: number;
+    note: string;
+  };
 }
 
 export interface ChargebackPrediction {

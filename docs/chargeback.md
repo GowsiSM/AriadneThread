@@ -86,7 +86,11 @@ Builds a structured response package.
 
 ### `backend/app/chargeback/case_manager.py`
 
-In-memory case store loaded from `data/chargeback_cases.csv`.
+In-memory case store loaded from `data/chargeback_cases.csv`. Status changes
+(OPEN -> UNDER_REVIEW -> RESPONDED -> CLOSED) persist for the lifetime of
+the process only. This is intentional for the demo — no database dependency
+keeps the system simple and self-contained. In production, this would be
+backed by a persistent store.
 
 ## API Endpoints
 

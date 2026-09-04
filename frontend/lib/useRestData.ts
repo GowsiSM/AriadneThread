@@ -161,6 +161,22 @@ export async function assignCase(caseId: string, analyst: string) {
 // Chargeback Evidence Responder
 // ---------------------------------------------------------------------------
 
+export async function transitionChargebackStatus(
+  caseId: string,
+  toStatus: string,
+): Promise<ChargebackCase> {
+  const res = await fetch(`${API_URL}/api/chargeback/cases/${caseId}/status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: toStatus }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 export function useChargebackCases(pollMs = 5000) {
   const [cases, setCases] = useState<ChargebackCase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -195,7 +211,7 @@ export function useChargebackCase(caseId: string | null) {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!caseId) return;
+    if (!caseId) { setLoading(false); return; }
     try {
       const res = await fetch(`${API_URL}/api/chargeback/cases/${caseId}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -222,7 +238,7 @@ export function useChargebackEvidence(caseId: string | null) {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!caseId) return;
+    if (!caseId) { setLoading(false); return; }
     try {
       const res = await fetch(`${API_URL}/api/chargeback/evidence/${caseId}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -249,7 +265,7 @@ export function useChargebackResponse(caseId: string | null) {
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!caseId) return;
+    if (!caseId) { setLoading(false); return; }
     try {
       const res = await fetch(`${API_URL}/api/chargeback/response/${caseId}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

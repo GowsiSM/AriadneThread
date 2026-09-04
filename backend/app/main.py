@@ -521,10 +521,29 @@ async def predict_chargeback_risk(transaction: dict):
     return ml_predictor.predict(transaction)
 
 
+def _case_ml_risk(case: dict) -> dict:
+    """Compute the ML fraud-risk signal for a case (score + level)."""
+    try:
+        evidence_result = evidence_engine.collect_evidence(case)
+        ml = evidence_result.get("evidence", {}).get("ml_risk", {})
+        return {
+            "risk_score": ml.get("risk_score"),
+            "risk_level": ml.get("risk_level", "unknown"),
+            "available": ml.get("available", False),
+        }
+    except Exception:  # noqa: BLE001
+        return {"risk_score": None, "risk_level": "unknown", "available": False}
+
+
 @app.get("/api/chargeback/cases")
 async def list_chargeback_cases(status: str | None = None):
     cases = chargeback_manager.list_cases(status=status)
-    return {"cases": cases, "total": len(cases)}
+    enriched = []
+    for c in cases:
+        item = dict(c)
+        item["ml_risk"] = _case_ml_risk(c)
+        enriched.append(item)
+    return {"cases": enriched, "total": len(enriched)}
 
 
 @app.get("/api/chargeback/cases/{case_id}")
@@ -570,8 +589,9 @@ async def get_chargeback_evidence(case_id: str):
     evidence_result = evidence_engine.collect_evidence(case)
     # Flatten the prioritized evidence into the array the frontend expects
     priority_list = evidence_result.get("priority", [])
+    reason = case.get("reason_code", "")
     evidence_items = []
-    for item in priority_list:
+    for rank, item in enumerate(priority_list):
         cat = item.get("category", "")
         data = item.get("data", {})
         evidence_items.append({
@@ -580,9 +600,11 @@ async def get_chargeback_evidence(case_id: str):
             "description": item.get("label", ""),
             "value": data,
             "strength": _category_strength(cat, data),
+            "top_priority": rank < 2,
+            "reason_code": reason,
             "collected_at": datetime.now(timezone.utc).isoformat(),
         })
-    return {"case_id": case_id, "evidence": evidence_items}
+    return {"case_id": case_id, "reason_code": reason, "evidence": evidence_items}
 
 
 @app.get("/api/chargeback/response/{case_id}")

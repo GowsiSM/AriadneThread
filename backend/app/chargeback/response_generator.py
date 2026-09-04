@@ -51,7 +51,7 @@ class ResponseGenerator:
         priority = evidence_result.get("priority", [])
         strength = evidence_result.get("evidence_strength", 0.0)
 
-        recommendation = self._recommend(case, evidence, strength)
+        recommendation, rationale = self._recommend(case, evidence, strength)
         narrative = self._build_narrative(case, evidence, recommendation)
 
         return {
@@ -61,15 +61,19 @@ class ResponseGenerator:
             "narrative": narrative,
             "evidence": priority,
             "evidence_strength": strength,
+            "rationale": rationale,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
-    def _recommend(self, case: dict, evidence: dict, strength: float) -> str:
+    def _recommend(self, case: dict, evidence: dict, strength: float) -> tuple[str, dict]:
         """Decide whether to accept, contest, or request more info.
 
         Uses the top 3 evidence categories from REASON_PRIORITY for the
         chargeback reason code, and checks ml_risk direction explicitly
         (low risk supports contest; high risk supports accept/investigate).
+
+        Returns (recommendation, rationale) where rationale explains which
+        evidence categories drove the decision.
         """
         reason = case.get("reason_code", "")
         priority_cats = REASON_PRIORITY.get(reason, ["transaction", "customer", "device"])
@@ -78,6 +82,7 @@ class ResponseGenerator:
         top3 = priority_cats[:3]
         reason_score = 0.0
         reason_weight = 0.0
+        category_scores: dict[str, float] = {}
         for cat in top3:
             cat_data = evidence.get(cat, {})
             w = _CATEGORY_WEIGHTS.get(cat, 0.1)
@@ -86,28 +91,41 @@ class ResponseGenerator:
                     # Low fraud score = strong evidence FOR the merchant (supports contest).
                     # High fraud score = evidence AGAINST contesting.
                     risk = float(cat_data.get("risk_score", 0.5) or 0.5)
-                    reason_score += (1.0 - risk) * w
+                    cat_score = (1.0 - risk)
+                    category_scores[cat] = round(cat_score, 2)
                 else:
-                    reason_score += 0.5 * w  # unknown — neutral
+                    cat_score = 0.5  # unknown — neutral
+                    category_scores[cat] = 0.5
             elif cat == "authentication":
                 auth = cat_data.get("auth_strength", "unknown")
-                reason_score += {"strong": 0.9, "moderate": 0.5, "weak": 0.2}.get(auth, 0.3) * w
+                cat_score = {"strong": 0.9, "moderate": 0.5, "weak": 0.2}.get(auth, 0.3)
+                category_scores[cat] = cat_score
             elif cat == "device":
                 known = sum(1 for k in ("device_known", "ip_known") if cat_data.get(k))
-                reason_score += [0.0, 0.4, 0.8][known] * w
+                cat_score = [0.0, 0.4, 0.8][known]
+                category_scores[cat] = cat_score
             elif cat == "delivery":
                 # Delivery evidence is a stub — treat as low confidence.
-                reason_score += 0.05 * w
+                cat_score = 0.05
+                category_scores[cat] = cat_score
             elif cat == "transaction":
-                reason_score += (0.8 if cat_data.get("transaction_id") else 0.0) * w
+                cat_score = 0.8 if cat_data.get("transaction_id") else 0.0
+                category_scores[cat] = cat_score
             elif cat == "customer":
-                reason_score += (0.7 if cat_data.get("cardholder") else 0.0) * w
+                cat_score = 0.7 if cat_data.get("cardholder") else 0.0
+                category_scores[cat] = cat_score
             else:
-                reason_score += 0.3 * w
+                cat_score = 0.3
+                category_scores[cat] = cat_score
+            reason_score += cat_score * w
             reason_weight += w
 
         if reason_weight > 0:
             reason_score = reason_score / reason_weight
+
+        # Rank the driving categories (highest score first).
+        driving = sorted(category_scores.items(), key=lambda kv: kv[1], reverse=True)
+        driving_cats = [c for c, _ in driving]
 
         # --- Decision logic ---
         if reason in CONTEST_REASONS:
@@ -118,22 +136,63 @@ class ResponseGenerator:
             ml_high = ml_risk.get("available") and ml_score is not None and float(ml_score) > 0.7
 
             if ml_high:
-                # High ML fraud risk argues AGAINST contesting.
-                return "REQUEST_MORE_INFO"
+                return "REQUEST_MORE_INFO", {
+                    "reason": reason,
+                    "driving_categories": driving_cats,
+                    "category_scores": category_scores,
+                    "reason_score": round(reason_score, 2),
+                    "note": "High ML fraud risk argues against contesting; investigate further.",
+                }
             if reason_score >= 0.5:
-                return "CONTEST"
-            return "REQUEST_MORE_INFO"
+                return "CONTEST", {
+                    "reason": reason,
+                    "driving_categories": driving_cats,
+                    "category_scores": category_scores,
+                    "reason_score": round(reason_score, 2),
+                    "note": "Strong reason-relevant evidence and low ML risk support contesting.",
+                }
+            return "REQUEST_MORE_INFO", {
+                "reason": reason,
+                "driving_categories": driving_cats,
+                "category_scores": category_scores,
+                "reason_score": round(reason_score, 2),
+                "note": "Insufficient reason-relevant evidence to contest.",
+            }
 
         if reason in ACCEPT_REASONS:
             # For service issues: accept if the dispute is plausible and
             # evidence doesn't strongly favor the merchant.
             if reason_score < 0.4:
-                return "ACCEPT"
+                return "ACCEPT", {
+                    "reason": reason,
+                    "driving_categories": driving_cats,
+                    "category_scores": category_scores,
+                    "reason_score": round(reason_score, 2),
+                    "note": "Service dispute with weak merchant-side evidence; accept.",
+                }
             if reason_score >= 0.6:
-                return "REQUEST_MORE_INFO"
-            return "ACCEPT"
+                return "REQUEST_MORE_INFO", {
+                    "reason": reason,
+                    "driving_categories": driving_cats,
+                    "category_scores": category_scores,
+                    "reason_score": round(reason_score, 2),
+                    "note": "Strong merchant-side evidence for a service dispute; verify before deciding.",
+                }
+            return "ACCEPT", {
+                "reason": reason,
+                "driving_categories": driving_cats,
+                "category_scores": category_scores,
+                "reason_score": round(reason_score, 2),
+                "note": "Service dispute; evidence does not strongly favor the merchant.",
+            }
 
-        return "REQUEST_MORE_INFO"
+        return "REQUEST_MORE_INFO", {
+            "reason": reason,
+            "driving_categories": driving_cats,
+            "category_scores": category_scores,
+            "reason_score": round(reason_score, 2),
+            "note": "Unknown reason code; request more information.",
+        }
 
     def _build_narrative(self, case: dict, evidence: dict, recommendation: str) -> str:
         """Build a short human-readable narrative for the response."""

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -8,8 +9,9 @@ import {
   useChargebackCase,
   useChargebackEvidence,
   useChargebackResponse,
+  transitionChargebackStatus,
 } from "@/lib/useRestData";
-import type { EvidenceItem } from "@/lib/types";
+import type { EvidenceItem, ChargebackStatus } from "@/lib/types";
 
 const STATUS_VARIANTS: Record<string, "info" | "success" | "warning" | "danger" | "neutral"> = {
   OPEN: "warning",
@@ -69,6 +71,11 @@ function EvidenceCard({ item }: { item: EvidenceItem }) {
         </div>
         <StrengthBar strength={item.strength} />
       </div>
+      {item.top_priority && item.reason_code && (
+        <span className="mt-1.5 inline-block rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+          Top priority for {item.reason_code} disputes
+        </span>
+      )}
       <p className="mt-1.5 text-xs text-fg-secondary">{item.description}</p>
       {valueStr && (
         <pre className="mt-2 max-h-24 overflow-auto rounded bg-surface-subtle p-2 font-mono text-[10px] text-fg-muted">
@@ -79,10 +86,66 @@ function EvidenceCard({ item }: { item: EvidenceItem }) {
   );
 }
 
+const STATUS_FLOW: ChargebackStatus[] = ["OPEN", "UNDER_REVIEW", "RESPONDED", "CLOSED"];
+
+function StatusTransition({
+  current,
+  onTransition,
+  busy,
+}: {
+  current: ChargebackStatus;
+  onTransition: (to: ChargebackStatus) => void;
+  busy: boolean;
+}) {
+  const idx = STATUS_FLOW.indexOf(current);
+  const next = idx >= 0 && idx < STATUS_FLOW.length - 1 ? STATUS_FLOW[idx + 1] : null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {next && (
+        <button
+          onClick={() => onTransition(next)}
+          disabled={busy}
+          className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
+        >
+          {busy ? "Updating…" : `Mark ${next.replace("_", " ")}`}
+        </button>
+      )}
+      {current !== "CLOSED" && (
+        <button
+          onClick={() => onTransition("CLOSED")}
+          disabled={busy}
+          className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-fg-muted transition-colors hover:bg-surface-subtle disabled:opacity-50"
+        >
+          Close case
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function ChargebackCasePage({ caseId }: { caseId: string }) {
-  const { caseData, loading: caseLoading } = useChargebackCase(caseId);
+  const { caseData, loading: caseLoading, refresh: refreshCase } = useChargebackCase(caseId);
   const { evidence, loading: evidenceLoading } = useChargebackEvidence(caseId);
   const { response, loading: responseLoading } = useChargebackResponse(caseId);
+  const [transitioning, setTransitioning] = useState(false);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
+
+  const handleTransition = useCallback(
+    async (to: ChargebackStatus) => {
+      setTransitioning(true);
+      setTransitionError(null);
+      try {
+        await transitionChargebackStatus(caseId, to);
+        await refreshCase();
+      } catch (err) {
+        setTransitionError(err instanceof Error ? err.message : "Failed to update status");
+      } finally {
+        setTransitioning(false);
+      }
+    },
+    [caseId, refreshCase],
+  );
 
   if (caseLoading || evidenceLoading || responseLoading) return <LoadingState />;
   if (!caseData) {
@@ -106,6 +169,24 @@ export default function ChargebackCasePage({ caseId }: { caseId: string }) {
           title={`Chargeback ${caseData.case_id.slice(0, 12)}…`}
           description={caseData.reason_description}
         />
+      </div>
+
+      {/* Status transition control */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface p-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-fg-muted">Status:</span>
+          <StatusBadge variant={STATUS_VARIANTS[caseData.status] ?? "neutral"}>
+            {caseData.status}
+          </StatusBadge>
+        </div>
+        <StatusTransition
+          current={caseData.status}
+          onTransition={handleTransition}
+          busy={transitioning}
+        />
+        {transitionError && (
+          <span className="w-full text-xs text-danger">{transitionError}</span>
+        )}
       </div>
 
       {/* Case details */}
@@ -153,6 +234,29 @@ export default function ChargebackCasePage({ caseId }: { caseId: string }) {
             </span>
           </div>
           <p className="mt-2 text-xs text-fg-secondary">{response.narrative}</p>
+
+          {/* Why trail */}
+          {response.rationale && (
+            <div className="mt-3 rounded-md bg-surface-subtle p-3">
+              <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+                Why {response.recommendation.replace("_", " ")}
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                {response.rationale.driving_categories.map((cat) => (
+                  <span
+                    key={cat}
+                    className="rounded bg-accent/10 px-1.5 py-0.5 font-mono text-[10px] text-accent"
+                  >
+                    {cat}
+                  </span>
+                ))}
+                <span className="text-[10px] text-fg-muted">
+                  reason score {Math.round(response.rationale.reason_score * 100)}%
+                </span>
+              </div>
+              <p className="mt-1.5 text-xs text-fg-secondary">{response.rationale.note}</p>
+            </div>
+          )}
         </div>
       )}
 

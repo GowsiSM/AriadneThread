@@ -22,6 +22,32 @@ const PRIORITY_VARIANTS: Record<string, "info" | "success" | "warning" | "danger
   CRITICAL: "danger",
 };
 
+const RISK_VARIANTS: Record<string, "info" | "success" | "warning" | "danger" | "neutral"> = {
+  LOW: "success",
+  MEDIUM: "warning",
+  HIGH: "danger",
+  unknown: "neutral",
+};
+
+function RiskChip({ risk }: { risk: ChargebackCase["ml_risk"] }) {
+  if (!risk || !risk.available || risk.risk_score == null) return null;
+  const pct = Math.round(risk.risk_score * 100);
+  return (
+    <span
+      className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+        risk.risk_level === "HIGH"
+          ? "bg-danger/10 text-danger"
+          : risk.risk_level === "MEDIUM"
+            ? "bg-warning/10 text-warning"
+            : "bg-success/10 text-success"
+      }`}
+      title={`ML fraud risk: ${pct}%`}
+    >
+      ML {pct}%
+    </span>
+  );
+}
+
 function formatDate(iso: string) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-US", {
@@ -61,11 +87,14 @@ function CaseRow({ c }: { c: ChargebackCase }) {
         <div className="text-sm font-medium text-fg">{formatCurrency(c.amount, c.currency ?? "INR")}</div>
         <div className="text-xs text-fg-muted">{c.merchant}</div>
       </div>
-      {c.is_fraud && (
-        <span className="rounded bg-danger/10 px-1.5 py-0.5 text-[10px] font-medium text-danger">
-          FRAUD
-        </span>
-      )}
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <RiskChip risk={c.ml_risk} />
+        {c.is_fraud && (
+          <span className="rounded bg-danger/10 px-1.5 py-0.5 text-[10px] font-medium text-danger">
+            FRAUD
+          </span>
+        )}
+      </div>
     </Link>
   );
 }
