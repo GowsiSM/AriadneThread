@@ -23,6 +23,11 @@ from .detection import RingCandidate, run_detection
 from .graph_engine import TransactionGraph
 from .graph_intelligence import compute_flow_summary, classify_typology
 
+try:
+    from sklearn.metrics import roc_auc_score as _sklearn_roc_auc
+except Exception:  # noqa: BLE001  (sklearn optional)
+    _sklearn_roc_auc = None
+
 
 # ---------------------------------------------------------------------------
 # Threshold sweep + PR-AUC / ROC-AUC
@@ -108,11 +113,13 @@ def threshold_sweep(
         [p.precision for p in points],
     )
 
-    # ROC-AUC: area under TPR vs FPR curve
-    roc_auc = _compute_auc(
-        [p.fpr for p in points],
-        [p.tpr for p in points],
-    )
+    # ROC-AUC: computed from per-user continuous scores (max candidate score
+    # per user, 0 for unflagged users) rather than from the coarse threshold
+    # sweep points. The sweep points share identical FPR values across wide
+    # threshold ranges (the detector flags the same users), which makes a
+    # trapezoidal AUC over them meaningless and can produce values below 0.5
+    # even for a working detector.
+    roc_auc = _roc_auc_from_scores(candidates, user_index)
 
     # Optimal threshold: maximize F1
     best = max(points, key=lambda p: p.f1)
@@ -124,6 +131,58 @@ def threshold_sweep(
         optimal_threshold=best.threshold,
         best_f1=best.f1,
     )
+
+
+def _roc_auc_from_scores(candidates: list[RingCandidate], user_index: dict) -> float:
+    """Compute ROC-AUC from per-user max candidate scores.
+
+    Each user gets the highest score of any candidate they belong to (0 if
+    they are in no candidate). This yields a continuous score per user, which
+    produces a proper ROC curve -- unlike the coarse threshold sweep, whose
+    points share identical FPR values and give a misleading trapezoidal AUC.
+    """
+    if not candidates or not user_index:
+        return 0.0
+
+    user_scores: dict[str, float] = {}
+    for c in candidates:
+        for m in c.members:
+            user_scores[m] = max(user_scores.get(m, 0.0), c.score)
+
+    all_users = list(user_index.keys())
+    y_true = [1 if uid.startswith("F") else 0 for uid in all_users]
+    y_score = [user_scores.get(uid, 0.0) for uid in all_users]
+
+    if sum(y_true) == 0 or sum(y_true) == len(y_true):
+        return 0.0  # single-class: AUC undefined
+
+    if _sklearn_roc_auc is not None:
+        try:
+            return float(_sklearn_roc_auc(y_true, y_score))
+        except Exception:  # noqa: BLE001
+            pass
+
+    # Manual fallback: rank-based Mann-Whitney U statistic.
+    pairs = sorted(zip(y_score, y_true), key=lambda p: (p[0], p[1]))
+    ranks = {}
+    n = len(pairs)
+    i = 0
+    while i < n:
+        j = i
+        while j + 1 < n and pairs[j + 1][0] == pairs[i][0]:
+            j += 1
+        avg_rank = (i + j) / 2 + 1  # 1-based average rank for ties
+        for k in range(i, j + 1):
+            ranks[id(pairs[k])] = avg_rank
+        i = j + 1
+
+    n_pos = sum(y_true)
+    n_neg = len(y_true) - n_pos
+    if n_pos == 0 or n_neg == 0:
+        return 0.0
+    rank_sum_pos = sum(ranks[id(p)] for p in pairs if p[1] == 1)
+    auc = (rank_sum_pos - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
+    return max(0.0, min(1.0, auc))
 
 
 def _compute_auc(x: list[float], y: list[float]) -> float:
