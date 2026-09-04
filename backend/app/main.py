@@ -13,12 +13,13 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import synthetic, db
-from .ai_explainer import explain_ring
+from .ai_explainer import explain_ring, template_explanation
 from .detection import run_detection, RingCandidate
 from .fairness import compute_cohort_fp_stats, compute_blast_radius, precision_recall
 from .graph_engine import TransactionGraph
 from .investigation import CaseManager, CaseStatus, auto_create_cases
 from .versions import DETECTOR_VERSION, DATASET_VERSION, RUN_VERSION, log_versions
+from .ml.predictor import MLPredictor
 from .websocket_manager import ConnectionManager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -60,6 +61,7 @@ app.add_middleware(
 
 manager = ConnectionManager()
 case_manager = CaseManager()
+ml_predictor = MLPredictor()
 
 # ---- global in-process state (fine for an MVP single-worker demo) ----
 # Uses the 12-typology synthetic generator (app/synthetic.py) so the live
@@ -161,7 +163,12 @@ async def _run_detection_and_broadcast():
     flagged = [c for c in candidates if c.score >= SCORE_THRESHOLD][:5]
     for cand in flagged:
         cd = _candidate_to_dict(cand)
-        explanation = await explain_ring(cd)
+        # During streaming, use template explanations to avoid API calls.
+        # AI explanations are generated after the stream completes.
+        if stream_stats["done"]:
+            explanation = await explain_ring(cd)
+        else:
+            explanation = template_explanation(cd)
         blast = compute_blast_radius(cand, user_index, tx_value_by_user)
         blast_d = asdict(blast)
         db.save_ring(cd, explanation, blast_d)
@@ -200,6 +207,44 @@ async def _run_detection_and_broadcast():
     })
 
 
+async def _generate_ai_explanations():
+    """Generate AI explanations for all flagged rings after the stream completes.
+    
+    This is called once after the entire transaction stream has been processed.
+    It replaces the template explanations with AI-generated explanations and
+    broadcasts the updates to connected clients.
+    """
+    global latest_candidates
+    
+    flagged = [c for c in latest_candidates if c.score >= SCORE_THRESHOLD][:5]
+    if not flagged:
+        return
+    
+    logger.info("Generating AI explanations for %d flagged rings...", len(flagged))
+    db.log_audit("ai_explanation_start", {"n_rings": len(flagged)})
+    
+    for cand in flagged:
+        cd = _candidate_to_dict(cand)
+        explanation = await explain_ring(cd)
+        blast = compute_blast_radius(cand, user_index, tx_value_by_user)
+        blast_d = asdict(blast)
+        
+        # Update the stored ring with the new AI explanation
+        db.save_ring(cd, explanation, blast_d)
+        
+        # Broadcast the updated explanation to connected clients
+        await manager.broadcast({
+            "type": "explanation_update",
+            "ring_id": cand.ring_id,
+            "explanation": explanation,
+        })
+        
+        logger.info("AI explanation generated for ring %s (source: %s)", cand.ring_id, explanation["source"])
+    
+    db.log_audit("ai_explanation_complete", {"n_rings": len(flagged)})
+    logger.info("AI explanation generation complete.")
+
+
 async def _streamer():
     global recent_tx
     stream_stats["started"] = True
@@ -227,6 +272,9 @@ async def _streamer():
     stream_stats["done"] = True
     await manager.broadcast({"type": "stream_complete", "stream": stream_stats})
     db.log_audit("stream_complete", stream_stats)
+    
+    # Generate AI explanations after the stream completes
+    await _generate_ai_explanations()
 
 
 @app.on_event("startup")
@@ -273,7 +321,11 @@ async def get_ring(ring_id: str):
     for c in latest_candidates:
         if c.ring_id == ring_id:
             cd = _candidate_to_dict(c)
-            explanation = await explain_ring(cd)
+            # Use template explanation during streaming, AI explanation after stream completes
+            if stream_stats["done"]:
+                explanation = await explain_ring(cd)
+            else:
+                explanation = template_explanation(cd)
             blast = compute_blast_radius(c, user_index, tx_value_by_user)
             return {"ring": cd, "explanation": explanation, "blast_radius": asdict(blast)}
     return {"error": "not found"}
@@ -457,6 +509,11 @@ async def get_user(user_id: str):
     if not u:
         return {"error": "not found"}
     return asdict(u)
+
+
+@app.post("/api/chargeback/predict")
+async def predict_chargeback_risk(transaction: dict):
+    return ml_predictor.predict(transaction)
 
 
 @app.websocket("/ws/stream")

@@ -154,6 +154,17 @@ export function useSentinelSocket() {
           setStreamStats(msg.stream);
           break;
         }
+        case "explanation_update": {
+          // Update the explanation for a specific ring when AI explanations are generated after stream completes
+          setAlerts((prev) =>
+            prev.map((alert) =>
+              alert.ring.ring_id === msg.ring_id
+                ? { ...alert, explanation: msg.explanation }
+                : alert
+            )
+          );
+          break;
+        }
       }
     };
 
