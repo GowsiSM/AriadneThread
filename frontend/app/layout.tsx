@@ -16,14 +16,48 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fraud Ring Sentinel",
-  description: "Real-time, defense-only fraud-ring detection with fairness-audited alerts.",
+  title: "AriadneThread",
+  description:
+    "Real-time, defense-only fraud-ring detection with fairness-audited alerts.",
+  icons: {
+    icon: [
+      {
+        url: "/favicon-dark.png",
+        media: "(prefers-color-scheme: light)",
+        type: "image/png",
+      },
+      {
+        url: "/favicon-light.png",
+        media: "(prefers-color-scheme: dark)",
+        type: "image/png",
+      },
+      { url: "/favicon-dark.png", type: "image/png" },
+    ],
+    apple: [
+      {
+        url: "/favicon-dark.png",
+        media: "(prefers-color-scheme: light)",
+        type: "image/png",
+      },
+      {
+        url: "/favicon-light.png",
+        media: "(prefers-color-scheme: dark)",
+        type: "image/png",
+      },
+    ],
+  },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${jetbrainsMono.variable} min-h-screen bg-bg text-fg antialiased`}>
+      <body
+        className={`${inter.variable} ${jetbrainsMono.variable} min-h-screen bg-bg text-fg antialiased`}
+      >
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

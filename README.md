@@ -1,4 +1,4 @@
-# 🛡️ Fraud Ring Sentinel
+# 🛡️ AriadneThread
 
 A **defense-only, real-time fraud-ring detector** built for Razorpay's AI Buildathon (Track 02 — AI Risk Manager).
 
@@ -31,8 +31,8 @@ We ship **40** — the highest-recall point that still holds perfect precision �
 ### Docker (recommended)
 
 ```bash
-git clone https://github.com/GowsiSM/FraudRingSentinel.git
-cd FraudRingSentinel
+git clone https://github.com/GowsiSM/AriadneThread.git
+cd AriadneThread
 docker compose up --build
 ```
 

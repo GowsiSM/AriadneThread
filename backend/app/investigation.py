@@ -1,5 +1,5 @@
 """
-Investigation case management for Fraud Ring Sentinel.
+Investigation case management for AriadneThread.
 
 Implements the investigation workflow from the brief (Section 3.9):
   - CaseStatus lifecycle: OBSERVED -> SUSPICIOUS -> HIGH_RISK -> UNDER_REVIEW

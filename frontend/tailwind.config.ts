@@ -42,8 +42,23 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)", "Inter", "Geist", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
-        mono: ["var(--font-mono)", "JetBrains Mono", "Fira Code", "Geist Mono", "ui-monospace", "monospace"],
+        sans: [
+          "var(--font-sans)",
+          "Inter",
+          "Geist",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "sans-serif",
+        ],
+        mono: [
+          "var(--font-mono)",
+          "JetBrains Mono",
+          "Fira Code",
+          "Geist Mono",
+          "ui-monospace",
+          "monospace",
+        ],
       },
       borderRadius: {
         sm: "6px",
@@ -58,6 +73,8 @@ const config: Config = {
       animation: {
         "fade-in": "fadeIn 0.2s ease-out",
         "slide-in": "slideIn 0.2s ease-out",
+        "slow-spin": "spin 700ms linear infinite",
+        "counter-spin": "spin 1000ms linear infinite reverse",
       },
       keyframes: {
         fadeIn: {

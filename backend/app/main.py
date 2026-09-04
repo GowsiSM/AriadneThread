@@ -49,7 +49,7 @@ DETECTION_EVERY_N_EDGES = int(os.getenv("DETECTION_EVERY_N_EDGES", "30"))
 STREAM_TPS = float(os.getenv("STREAM_TPS", "15"))
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 
-app = FastAPI(title="Fraud Ring Sentinel API", version="0.1.0")
+app = FastAPI(title="AriadneThread API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_ORIGIN, "*"],

@@ -1,5 +1,5 @@
 """
-Adversarial / evasion testing for Fraud Ring Sentinel.
+Adversarial / evasion testing for AriadneThread.
 
 Our unique differentiator: none of the 7 reference repos test robustness
 to controlled fraud variations. This module generates perturbed versions

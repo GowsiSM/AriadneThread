@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Normalize an external transaction dataset into Fraud Ring Sentinel's schema.
+Normalize an external transaction dataset into AriadneThread's schema.
 
 This is primarily used to normalize the IBM AMLworld HI-Small dataset (if the
 user downloaded it via scripts/download_dataset.py) into our standard

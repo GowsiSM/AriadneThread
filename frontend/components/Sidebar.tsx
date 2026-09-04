@@ -100,16 +100,16 @@ export default function Sidebar({
       >
         {/* Logo area */}
         <div className="flex h-14 items-center gap-2.5 border-b border-border px-4">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent text-xs font-bold text-white">
-            FS
-          </span>
-          {!collapsed && (
+          {!collapsed ? (
             <div className="flex flex-col overflow-hidden">
-              <span className="font-sans text-sm font-bold tracking-tight text-fg">
-                Fraud Sentinel
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="brand-icon" aria-hidden="true" />
+                <span className="brand-text text-sm">AriadneThread</span>
+              </div>
               <span className="flex items-center gap-1.5 font-mono text-[10px] tracking-wide text-fg-muted">
-                <span className={`inline-block h-1.5 w-1.5 rounded-full ${connectionDot}`} />
+                <span
+                  className={`inline-block h-1.5 w-1.5 rounded-full ${connectionDot}`}
+                />
                 {connectionState === "open"
                   ? streamDone
                     ? "Stream completed"
@@ -117,6 +117,8 @@ export default function Sidebar({
                   : connectionState}
               </span>
             </div>
+          ) : (
+            <span className="brand-icon" aria-label="AriadneThread" />
           )}
         </div>
 

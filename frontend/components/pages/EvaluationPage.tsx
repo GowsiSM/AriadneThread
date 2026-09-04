@@ -67,11 +67,11 @@ function MetricCard({
 }) {
   return (
     <div className="card px-4 py-3">
-          <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
+      <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
         {label}
       </div>
       <div
-            className={`mt-0.5 font-mono text-lg font-semibold tabular-nums ${variant ? `text-${variant}` : "text-fg"}`}
+        className={`mt-0.5 font-mono text-lg font-semibold tabular-nums ${variant ? `text-${variant}` : "text-fg"}`}
       >
         {value}
       </div>
@@ -105,10 +105,7 @@ export default function EvaluationPage() {
     refresh();
   }, [refresh]);
 
-  if (loading && !data)
-    return (
-      <LoadingState message="Running evaluation — this may take a moment…" />
-    );
+  if (loading && !data) return <LoadingState cycleMessages />;
   if (error && !data)
     return (
       <EmptyState
@@ -289,27 +286,27 @@ export default function EvaluationPage() {
           </h3>
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-lg bg-surface-subtle p-3">
-                          <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
+              <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Train F1
               </div>
-                          <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-fg">
+              <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-fg">
                 {(temporal_split.train_metrics.f1 ?? 0).toFixed(3)}
               </div>
             </div>
             <div className="rounded-lg bg-surface-subtle p-3">
-                          <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
+              <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Test F1
               </div>
-                          <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-fg">
+              <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-fg">
                 {(temporal_split.test_metrics.f1 ?? 0).toFixed(3)}
               </div>
             </div>
             <div className="rounded-lg bg-surface-subtle p-3">
-                          <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
+              <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Decay rate
               </div>
               <div
-                            className={`mt-0.5 font-mono text-lg font-semibold tabular-nums ${temporal_split.decay_rate < 0.1 ? "text-success" : "text-warning"}`}
+                className={`mt-0.5 font-mono text-lg font-semibold tabular-nums ${temporal_split.decay_rate < 0.1 ? "text-success" : "text-warning"}`}
               >
                 {(temporal_split.decay_rate * 100).toFixed(1)}%
               </div>
@@ -326,34 +323,34 @@ export default function EvaluationPage() {
           </h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
             <div className="rounded-lg bg-surface-subtle p-3">
-                        <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
+              <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Avg score drop
               </div>
-                        <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-warning">
+              <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-warning">
                 {adversarial.avg_score_drop.toFixed(1)}
               </div>
             </div>
             <div className="rounded-lg bg-surface-subtle p-3">
-                        <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
+              <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Max score drop
               </div>
-                        <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-danger">
+              <div className="mt-0.5 font-mono text-lg font-semibold tabular-nums text-danger">
                 {adversarial.max_score_drop.toFixed(1)}
               </div>
             </div>
             <div className="rounded-lg bg-surface-subtle p-3">
-                        <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
+              <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Worst evasion
               </div>
-                        <div className="mt-0.5 font-mono text-sm text-fg-secondary">
+              <div className="mt-0.5 font-mono text-sm text-fg-secondary">
                 {adversarial.worst_evasion}
               </div>
             </div>
             <div className="rounded-lg bg-surface-subtle p-3">
-                        <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
+              <div className="font-mono text-[10px] uppercase tracking-wider text-fg-muted">
                 Best robustness
               </div>
-                        <div className="mt-0.5 font-mono text-sm text-fg-secondary">
+              <div className="mt-0.5 font-mono text-sm text-fg-secondary">
                 {adversarial.best_robustness}
               </div>
             </div>

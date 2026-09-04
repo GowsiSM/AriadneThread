@@ -1,7 +1,7 @@
 # Frontend
 
 The frontend is a Next.js 14 (App Router) single-page application that renders
-the Fraud Ring Sentinel backend's live stream and REST APIs. It is a
+the AriadneThread backend's live stream and REST APIs. It is a
 client-side dashboard: pages are `"use client"` components switched by
 `PageRouter` based on the current pathname.
 
@@ -17,18 +17,18 @@ client-side dashboard: pages are `"use client"` components switched by
 
 ## Pages
 
-| Route | Component | Data |
-| --- | --- | --- |
-| `/` | DashboardPage | WS snapshot |
-| `/rings` | RingsPage | WS alerts |
-| `/rings/[id]` | RingDetailPage | WS alert + graph intelligence fields |
-| `/transactions` | TransactionsPage | WS recent tx |
-| `/graph` | GraphPage | WS recent tx + alerts |
-| `/fairness` | FairnessPage | WS cohorts |
-| `/metrics` | MetricsPage | WS metrics |
-| `/investigation` | InvestigationPage | REST `/api/cases` |
-| `/evaluation` | EvaluationPage | REST `/api/evaluation` |
-| `/versions` | VersionsPage | REST `/api/versions` |
+| Route            | Component         | Data                                 |
+| ---------------- | ----------------- | ------------------------------------ |
+| `/`              | DashboardPage     | WS snapshot                          |
+| `/rings`         | RingsPage         | WS alerts                            |
+| `/rings/[id]`    | RingDetailPage    | WS alert + graph intelligence fields |
+| `/transactions`  | TransactionsPage  | WS recent tx                         |
+| `/graph`         | GraphPage         | WS recent tx + alerts                |
+| `/fairness`      | FairnessPage      | WS cohorts                           |
+| `/metrics`       | MetricsPage       | WS metrics                           |
+| `/investigation` | InvestigationPage | REST `/api/cases`                    |
+| `/evaluation`    | EvaluationPage    | REST `/api/evaluation`               |
+| `/versions`      | VersionsPage      | REST `/api/versions`                 |
 
 ## Investigation page
 

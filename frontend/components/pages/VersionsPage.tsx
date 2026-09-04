@@ -20,15 +20,30 @@ function HashTag({ label, hash }: { label: string; hash: string }) {
 export default function VersionsPage() {
   const { versions, loading, error, refresh } = useVersions();
 
-  if (loading && !versions) return <LoadingState message="Loading versions…" />;
+  if (loading && !versions) return <LoadingState cycleMessages />;
   if (error && !versions)
-    return <EmptyState icon="⚠" title="Failed to load versions" description={error} />;
+    return (
+      <EmptyState
+        icon="⚠"
+        title="Failed to load versions"
+        description={error}
+      />
+    );
   if (!versions)
-    return <EmptyState icon="○" title="No version data" description="Detection has not run yet." />;
+    return (
+      <EmptyState
+        icon="○"
+        title="No version data"
+        description="Detection has not run yet."
+      />
+    );
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Versions" description="Deterministic version hashes for reproducibility and audit trail">
+      <PageHeader
+        title="Versions"
+        description="Deterministic version hashes for reproducibility and audit trail"
+      >
         <button
           onClick={refresh}
           className="rounded-md border border-border bg-surface-subtle px-3 py-1.5 text-xs font-medium text-fg transition-colors hover:border-accent hover:text-accent"
@@ -74,7 +89,8 @@ export default function VersionsPage() {
           ))}
         </div>
         <div className="mt-3 rounded-lg bg-surface-subtle p-2.5 text-xs text-fg-muted">
-          Threshold: <span className="font-mono text-fg">{versions.threshold}</span>
+          Threshold:{" "}
+          <span className="font-mono text-fg">{versions.threshold}</span>
         </div>
       </div>
 

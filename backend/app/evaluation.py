@@ -1,5 +1,5 @@
 """
-Evaluation harness for Fraud Ring Sentinel.
+Evaluation harness for AriadneThread.
 
 Provides offline evaluation tools that go beyond basic precision/recall:
   - Threshold sweep with PR-AUC / ROC-AUC curves

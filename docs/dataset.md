@@ -4,7 +4,7 @@
 
 The `backend/app/synthetic.py` module generates deterministic, reproducible fraud-ring
 scenarios with ground-truth labels for evaluation. It is the **primary dataset** for the
-Fraud Ring Sentinel system.
+AriadneThread system.
 
 The `backend/app/data_gen.py` module is preserved for the streaming demo
 and backward-compatible tests.

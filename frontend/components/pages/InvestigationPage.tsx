@@ -12,7 +12,11 @@ import {
   addCaseNote,
   assignCase,
 } from "@/lib/useRestData";
-import { caseStatusVariant, casePriorityVariant, nextTransitions } from "@/components/caseBadges";
+import {
+  caseStatusVariant,
+  casePriorityVariant,
+  nextTransitions,
+} from "@/components/caseBadges";
 import type { InvestigationCase, CaseStatus } from "@/lib/types";
 
 const STATUS_ORDER: CaseStatus[] = [
@@ -51,11 +55,15 @@ function CaseRow({
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs font-semibold text-fg">{c.case_id}</span>
+          <span className="font-mono text-xs font-semibold text-fg">
+            {c.case_id}
+          </span>
           <StatusBadge variant={caseStatusVariant(c.status)} dot>
             {c.status}
           </StatusBadge>
-          <StatusBadge variant={casePriorityVariant(c.priority)}>{c.priority}</StatusBadge>
+          <StatusBadge variant={casePriorityVariant(c.priority)}>
+            {c.priority}
+          </StatusBadge>
         </div>
         <div className="mt-1 flex items-center gap-2 text-[11px] text-fg-muted">
           <span className="font-mono">{c.ring_id}</span>
@@ -73,7 +81,9 @@ function CaseRow({
       </div>
       <div className="shrink-0 text-right text-[11px] text-fg-muted">
         <div>{formatTime(c.updated_at)}</div>
-        {c.assigned_to && <div className="mt-0.5 text-fg-secondary">@{c.assigned_to}</div>}
+        {c.assigned_to && (
+          <div className="mt-0.5 text-fg-secondary">@{c.assigned_to}</div>
+        )}
       </div>
     </button>
   );
@@ -92,10 +102,20 @@ function CaseDetail({
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  if (loading && !caseData) return <LoadingState message="Loading case…" />;
+  if (loading && !caseData)
+    return <LoadingState message="Establishing Secure Tunnel…" />;
   if (error && !caseData)
-    return <EmptyState icon="⚠" title="Failed to load case" description={error} />;
-  if (!caseData) return <EmptyState icon="○" title="Select a case" description="Choose a case from the list to inspect it." />;
+    return (
+      <EmptyState icon="⚠" title="Failed to load case" description={error} />
+    );
+  if (!caseData)
+    return (
+      <EmptyState
+        icon="○"
+        title="Select a case"
+        description="Choose a case from the list to inspect it."
+      />
+    );
 
   const c = caseData;
   const transitions = nextTransitions(c.status);
@@ -117,38 +137,62 @@ function CaseDetail({
     <div className="flex flex-col gap-4">
       <div className="card p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-sm font-semibold text-fg">{c.case_id}</span>
+          <span className="font-mono text-sm font-semibold text-fg">
+            {c.case_id}
+          </span>
           <StatusBadge variant={caseStatusVariant(c.status)} dot>
             {c.status}
           </StatusBadge>
-          <StatusBadge variant={casePriorityVariant(c.priority)}>{c.priority}</StatusBadge>
+          <StatusBadge variant={casePriorityVariant(c.priority)}>
+            {c.priority}
+          </StatusBadge>
           {c.assigned_to && (
             <StatusBadge variant="info">assigned: {c.assigned_to}</StatusBadge>
           )}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-lg bg-surface-subtle p-3">
-            <div className="text-[10px] uppercase tracking-wider text-fg-muted">Ring</div>
-            <Link href={`/rings/${c.ring_id}`} className="mt-0.5 block font-mono text-xs text-accent hover:underline">
+            <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+              Ring
+            </div>
+            <Link
+              href={`/rings/${c.ring_id}`}
+              className="mt-0.5 block font-mono text-xs text-accent hover:underline"
+            >
               {c.ring_id}
             </Link>
           </div>
           <div className="rounded-lg bg-surface-subtle p-3">
-            <div className="text-[10px] uppercase tracking-wider text-fg-muted">Score</div>
-            <div className="mt-0.5 font-mono text-lg font-semibold text-fg">{c.score.toFixed(1)}</div>
+            <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+              Score
+            </div>
+            <div className="mt-0.5 font-mono text-lg font-semibold text-fg">
+              {c.score.toFixed(1)}
+            </div>
           </div>
           <div className="rounded-lg bg-surface-subtle p-3">
-            <div className="text-[10px] uppercase tracking-wider text-fg-muted">Typology</div>
-            <div className="mt-0.5 text-sm text-fg-secondary">{c.typology ?? "—"}</div>
+            <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+              Typology
+            </div>
+            <div className="mt-0.5 text-sm text-fg-secondary">
+              {c.typology ?? "—"}
+            </div>
           </div>
           <div className="rounded-lg bg-surface-subtle p-3">
-            <div className="text-[10px] uppercase tracking-wider text-fg-muted">Members</div>
-            <div className="mt-0.5 font-mono text-lg font-semibold text-fg">{c.members.length}</div>
+            <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+              Members
+            </div>
+            <div className="mt-0.5 font-mono text-lg font-semibold text-fg">
+              {c.members.length}
+            </div>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {c.members.map((m) => (
-            <span key={m} className="rounded-md border border-border bg-surface-subtle px-2 py-0.5 font-mono text-[11px] text-fg-secondary">
+            <span
+              key={m}
+              className="rounded-md border border-border bg-surface-subtle px-2 py-0.5 font-mono text-[11px] text-fg-secondary"
+            >
               {m}
             </span>
           ))}
@@ -157,7 +201,9 @@ function CaseDetail({
 
       {/* Actions */}
       <div className="card p-4">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-fg-muted">Actions</h3>
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-fg-muted">
+          Actions
+        </h3>
         {transitions.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {transitions.map((t) => (
@@ -172,7 +218,9 @@ function CaseDetail({
             ))}
           </div>
         ) : (
-          <p className="text-xs text-fg-muted">This case is in a terminal state.</p>
+          <p className="text-xs text-fg-muted">
+            This case is in a terminal state.
+          </p>
         )}
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
@@ -184,7 +232,12 @@ function CaseDetail({
           />
           <button
             disabled={busy || !note.trim()}
-            onClick={() => run(async () => { await addCaseNote(c.case_id, note.trim()); setNote(""); })}
+            onClick={() =>
+              run(async () => {
+                await addCaseNote(c.case_id, note.trim());
+                setNote("");
+              })
+            }
             className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
             Add note
@@ -200,23 +253,35 @@ function CaseDetail({
           />
           <button
             disabled={busy || !analyst.trim()}
-            onClick={() => run(async () => { await assignCase(c.case_id, analyst.trim()); setAnalyst(""); })}
+            onClick={() =>
+              run(async () => {
+                await assignCase(c.case_id, analyst.trim());
+                setAnalyst("");
+              })
+            }
             className="rounded-md border border-border bg-surface-subtle px-3 py-1.5 text-xs font-medium text-fg transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
           >
             Assign
           </button>
         </div>
 
-        {actionError && <p className="mt-2 text-xs text-danger">{actionError}</p>}
+        {actionError && (
+          <p className="mt-2 text-xs text-danger">{actionError}</p>
+        )}
       </div>
 
       {/* Notes */}
       {c.notes.length > 0 && (
         <div className="card p-4">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-fg-muted">Notes</h3>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-fg-muted">
+            Notes
+          </h3>
           <div className="flex flex-col gap-2">
             {c.notes.map((n, i) => (
-              <div key={i} className="rounded-lg border border-border bg-surface-subtle px-3 py-2 text-xs text-fg-secondary">
+              <div
+                key={i}
+                className="rounded-lg border border-border bg-surface-subtle px-3 py-2 text-xs text-fg-secondary"
+              >
                 {n}
               </div>
             ))}
@@ -226,7 +291,9 @@ function CaseDetail({
 
       {/* Timeline */}
       <div className="card p-4">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-muted">Timeline</h3>
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg-muted">
+          Timeline
+        </h3>
         {c.timeline && c.timeline.length > 0 ? (
           <div className="flex flex-col gap-3">
             {c.timeline.map((ev) => (
@@ -237,15 +304,29 @@ function CaseDetail({
                 </div>
                 <div className="pb-1">
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="font-medium text-fg">{ev.event_type.replace(/_/g, " ")}</span>
-                    <span className="text-fg-muted">· {formatTime(ev.timestamp)}</span>
+                    <span className="font-medium text-fg">
+                      {ev.event_type.replace(/_/g, " ")}
+                    </span>
+                    <span className="text-fg-muted">
+                      · {formatTime(ev.timestamp)}
+                    </span>
                     <span className="text-fg-muted">· {ev.actor}</span>
                   </div>
                   {(ev.from_status || ev.to_status) && (
                     <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-fg-secondary">
-                      {ev.from_status && <StatusBadge variant="neutral">{ev.from_status}</StatusBadge>}
-                      {ev.from_status && ev.to_status && <span className="text-fg-muted">→</span>}
-                      {ev.to_status && <StatusBadge variant={caseStatusVariant(ev.to_status)}>{ev.to_status}</StatusBadge>}
+                      {ev.from_status && (
+                        <StatusBadge variant="neutral">
+                          {ev.from_status}
+                        </StatusBadge>
+                      )}
+                      {ev.from_status && ev.to_status && (
+                        <span className="text-fg-muted">→</span>
+                      )}
+                      {ev.to_status && (
+                        <StatusBadge variant={caseStatusVariant(ev.to_status)}>
+                          {ev.to_status}
+                        </StatusBadge>
+                      )}
                     </div>
                   )}
                   {ev.detail && Object.keys(ev.detail).length > 0 && (
@@ -270,7 +351,10 @@ export default function InvestigationPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<CaseStatus | "ALL">("ALL");
 
-  const filtered = statusFilter === "ALL" ? cases : cases.filter((c) => c.status === statusFilter);
+  const filtered =
+    statusFilter === "ALL"
+      ? cases
+      : cases.filter((c) => c.status === statusFilter);
 
   return (
     <div className="flex flex-col gap-6">
@@ -280,8 +364,12 @@ export default function InvestigationPage() {
       >
         {summary && (
           <div className="flex items-center gap-2">
-            <StatusBadge variant="warning">{summary.open_cases} open</StatusBadge>
-            <StatusBadge variant="success">{summary.closed_cases} closed</StatusBadge>
+            <StatusBadge variant="warning">
+              {summary.open_cases} open
+            </StatusBadge>
+            <StatusBadge variant="success">
+              {summary.closed_cases} closed
+            </StatusBadge>
           </div>
         )}
       </PageHeader>
@@ -290,19 +378,33 @@ export default function InvestigationPage() {
       {summary && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="card px-4 py-3">
-            <div className="text-[10px] uppercase tracking-wider text-fg-muted">Total cases</div>
-            <div className="mt-0.5 font-mono text-lg font-semibold text-fg">{summary.total_cases}</div>
+            <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+              Total cases
+            </div>
+            <div className="mt-0.5 font-mono text-lg font-semibold text-fg">
+              {summary.total_cases}
+            </div>
           </div>
           <div className="card px-4 py-3">
-            <div className="text-[10px] uppercase tracking-wider text-fg-muted">Open</div>
-            <div className="mt-0.5 font-mono text-lg font-semibold text-warning">{summary.open_cases}</div>
+            <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+              Open
+            </div>
+            <div className="mt-0.5 font-mono text-lg font-semibold text-warning">
+              {summary.open_cases}
+            </div>
           </div>
           <div className="card px-4 py-3">
-            <div className="text-[10px] uppercase tracking-wider text-fg-muted">Closed</div>
-            <div className="mt-0.5 font-mono text-lg font-semibold text-success">{summary.closed_cases}</div>
+            <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+              Closed
+            </div>
+            <div className="mt-0.5 font-mono text-lg font-semibold text-success">
+              {summary.closed_cases}
+            </div>
           </div>
           <div className="card px-4 py-3">
-            <div className="text-[10px] uppercase tracking-wider text-fg-muted">Critical</div>
+            <div className="text-[10px] uppercase tracking-wider text-fg-muted">
+              Critical
+            </div>
             <div className="mt-0.5 font-mono text-lg font-semibold text-danger">
               {summary.by_priority?.CRITICAL ?? 0}
             </div>
@@ -338,7 +440,7 @@ export default function InvestigationPage() {
       </div>
 
       {loading && cases.length === 0 ? (
-        <LoadingState message="Loading cases…" />
+        <LoadingState cycleMessages />
       ) : error && cases.length === 0 ? (
         <EmptyState icon="⚠" title="Failed to load cases" description={error} />
       ) : filtered.length === 0 ? (
@@ -352,7 +454,12 @@ export default function InvestigationPage() {
           {/* Case list */}
           <div className="flex flex-col gap-2">
             {filtered.map((c) => (
-              <CaseRow key={c.case_id} c={c} selected={c.case_id === selectedId} onSelect={setSelectedId} />
+              <CaseRow
+                key={c.case_id}
+                c={c}
+                selected={c.case_id === selectedId}
+                onSelect={setSelectedId}
+              />
             ))}
           </div>
           {/* Detail */}
@@ -360,7 +467,11 @@ export default function InvestigationPage() {
             {selectedId ? (
               <CaseDetail caseId={selectedId} onRefresh={refresh} />
             ) : (
-              <EmptyState icon="◫" title="Select a case" description="Click a case on the left to inspect its lifecycle, notes, and timeline." />
+              <EmptyState
+                icon="◫"
+                title="Select a case"
+                description="Click a case on the left to inspect its lifecycle, notes, and timeline."
+              />
             )}
           </div>
         </div>

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate the Fraud Ring Sentinel synthetic AML/fraud dataset.
+Generate the AriadneThread synthetic AML/fraud dataset.
 
 Writes normalized CSV/JSON artifacts to data/processed/:
   * transactions.csv      -- the transaction stream (detector input)
