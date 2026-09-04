@@ -166,7 +166,7 @@ export default function ChargebackCasePage({ caseId }: { caseId: string }) {
           ← Back to chargebacks
         </Link>
         <PageHeader
-          title={`Chargeback ${caseData.case_id.slice(0, 12)}…`}
+          title={`Chargeback ${caseData.case_id}`}
           description={caseData.reason_description}
         />
       </div>

@@ -30,20 +30,27 @@ const RISK_VARIANTS: Record<string, "info" | "success" | "warning" | "danger" | 
 };
 
 function RiskChip({ risk }: { risk: ChargebackCase["ml_risk"] }) {
-  if (!risk || !risk.available || risk.risk_score == null) return null;
+  if (!risk || !risk.available || risk.risk_score == null) {
+    return (
+      <span className="rounded bg-surface-subtle px-1.5 py-0.5 text-[10px] font-medium text-fg-muted">
+        ML n/a
+      </span>
+    );
+  }
   const pct = Math.round(risk.risk_score * 100);
+  const level = risk.risk_level === "unknown" ? "LOW" : risk.risk_level;
   return (
     <span
       className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-        risk.risk_level === "HIGH"
+        level === "HIGH"
           ? "bg-danger/10 text-danger"
-          : risk.risk_level === "MEDIUM"
+          : level === "MEDIUM"
             ? "bg-warning/10 text-warning"
             : "bg-success/10 text-success"
       }`}
-      title={`ML fraud risk: ${pct}%`}
+      title={`ML fraud risk: ${pct}% (${level})`}
     >
-      ML {pct}%
+      ML {pct}% · {level}
     </span>
   );
 }
@@ -72,7 +79,7 @@ function CaseRow({ c }: { c: ChargebackCase }) {
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-fg-muted">{c.case_id.slice(0, 12)}…</span>
+                <span className="font-mono text-xs text-fg-muted">{c.case_id}</span>
           <StatusBadge variant={STATUS_VARIANTS[c.status] ?? "neutral"}>{c.status}</StatusBadge>
           <StatusBadge variant={PRIORITY_VARIANTS[c.priority] ?? "neutral"}>{c.priority}</StatusBadge>
         </div>
@@ -80,7 +87,7 @@ function CaseRow({ c }: { c: ChargebackCase }) {
           {c.reason_description}
         </div>
         <div className="mt-0.5 font-mono text-xs text-fg-muted">
-          Tx: {c.transaction_id.slice(0, 16)}… · Filed {formatDate(c.filed_at)}
+                Tx: {c.transaction_id} · Filed {formatDate(c.filed_at)}
         </div>
       </div>
       <div className="text-right shrink-0">
