@@ -98,6 +98,33 @@ class ChargebackCaseManager:
     # Mutations
     # ------------------------------------------------------------------
 
+    def create_case(self, case: dict) -> dict:
+        """Create a new chargeback case and return it."""
+        case_id = case.get("case_id") or f"CB-{len(self.cases) + 1:04d}"
+        self.cases[case_id] = {
+            "case_id": case_id,
+            "transaction_id": case.get("transaction_id", ""),
+            "cardholder": case.get("cardholder", ""),
+            "merchant": case.get("merchant", ""),
+            "amount": float(case.get("amount", 0) or 0),
+            "reason_code": case.get("reason_code", ""),
+            "reason_description": case.get("reason_description", ""),
+            "filed_at": case.get("filed_at", datetime.now(timezone.utc).isoformat()),
+            "status": case.get("status", "OPEN"),
+            "priority": case.get("priority", "LOW"),
+            "is_fraud": int(case.get("is_fraud", 0) or 0),
+        }
+        self._add_note(case_id, "Case created", "system")
+        return self.get_case(case_id)
+
+    def update_status(self, case_id: str, to_status: str, actor: str = "analyst") -> dict | None:
+        """Transition a case to a new status. Returns None on invalid input."""
+        if case_id not in self.cases:
+            return None
+        if to_status not in VALID_STATUSES:
+            return None
+        return self.transition(case_id, to_status, actor)
+
     def transition(self, case_id: str, to_status: str, actor: str = "analyst") -> dict:
         if case_id not in self.cases:
             raise KeyError(case_id)

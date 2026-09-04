@@ -49,13 +49,22 @@ def _parse_time(raw) -> datetime:
         return datetime.utcnow()
 
 
-def add_features(df: pd.DataFrame) -> pd.DataFrame:
+def add_features(
+    df: pd.DataFrame,
+    customer_freq: dict | None = None,
+    merchant_freq: dict | None = None,
+) -> pd.DataFrame:
     """Add engineered features to a DataFrame of raw transactions.
 
     The input DataFrame must contain at least: amt, trans_date_trans_time (or
     ts), lat, long, merch_lat, merch_long, city_pop, category, cc_num (or
     sender), merchant (or receiver). Missing optional columns are filled with
     safe defaults so a partial payload still produces a valid feature vector.
+
+    Args:
+        df: raw transaction DataFrame.
+        customer_freq: precomputed {cc_num: count} lookup from training data.
+        merchant_freq: precomputed {merchant: count} lookup from training data.
     """
     df = df.copy()
 
@@ -81,14 +90,25 @@ def add_features(df: pd.DataFrame) -> pd.DataFrame:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
     # --- Frequency features ---
-    # customer_frequency: how many times this card/account appears in the batch.
+    # Use precomputed lookup tables from training data when available.
+    # Without lookups, a single-row DataFrame always produces frequency=1.
     cust_col = "cc_num" if "cc_num" in df.columns else "sender"
     merch_col = "merchant" if "merchant" in df.columns else "receiver"
-    if cust_col in df.columns:
+
+    if customer_freq is not None and cust_col in df.columns:
+        df["customer_frequency"] = df[cust_col].map(
+            lambda x: customer_freq.get(str(x), 1)
+        )
+    elif cust_col in df.columns and len(df) > 1:
         df["customer_frequency"] = df.groupby(cust_col)[cust_col].transform("count")
     else:
         df["customer_frequency"] = 1
-    if merch_col in df.columns:
+
+    if merchant_freq is not None and merch_col in df.columns:
+        df["merchant_frequency"] = df[merch_col].map(
+            lambda x: merchant_freq.get(str(x), 1)
+        )
+    elif merch_col in df.columns and len(df) > 1:
         df["merchant_frequency"] = df.groupby(merch_col)[merch_col].transform("count")
     else:
         df["merchant_frequency"] = 1

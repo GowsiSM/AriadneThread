@@ -541,6 +541,27 @@ async def create_chargeback_case(case: dict):
     return created
 
 
+def _category_strength(category: str, data: dict) -> float:
+    """Compute per-category evidence strength (0..1)."""
+    if category == "transaction":
+        return 0.8 if data.get("transaction_id") else 0.0
+    if category == "customer":
+        return 0.7 if data.get("cardholder") and data.get("account_age_days") != "unknown" else 0.3
+    if category == "device":
+        known = sum(1 for k in ("device_known", "ip_known") if data.get(k))
+        return [0.0, 0.4, 0.8][known]
+    if category == "authentication":
+        return {"strong": 0.9, "moderate": 0.5, "weak": 0.2}.get(data.get("auth_strength", ""), 0.1)
+    if category == "delivery":
+        return 0.05  # stub — not implemented, show low confidence
+    if category == "ml_risk":
+        if not data.get("available"):
+            return 0.1
+        score = data.get("risk_score")
+        return round(min(float(score or 0), 1.0), 2)
+    return 0.3
+
+
 @app.get("/api/chargeback/evidence/{case_id}")
 async def get_chargeback_evidence(case_id: str):
     case = chargeback_manager.get_case(case_id)
@@ -551,12 +572,14 @@ async def get_chargeback_evidence(case_id: str):
     priority_list = evidence_result.get("priority", [])
     evidence_items = []
     for item in priority_list:
+        cat = item.get("category", "")
+        data = item.get("data", {})
         evidence_items.append({
-            "category": item.get("category", ""),
+            "category": cat,
             "type": item.get("label", ""),
             "description": item.get("label", ""),
-            "value": item.get("data", {}),
-            "strength": evidence_result.get("evidence_strength", 0),
+            "value": data,
+            "strength": _category_strength(cat, data),
             "collected_at": datetime.now(timezone.utc).isoformat(),
         })
     return {"case_id": case_id, "evidence": evidence_items}

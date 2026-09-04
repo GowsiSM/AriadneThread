@@ -14,11 +14,23 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from .evidence_priority import REASON_PRIORITY
+
 # Reason codes where the merchant should typically contest (fraud claims).
 CONTEST_REASONS = {"FRAUD", "FRAUD_ACCOUNT_TAKEOVER"}
 # Reason codes where the merchant should typically accept (service issues).
 ACCEPT_REASONS = {"NOT_RECEIVED", "NOT_AS_DESCRIBED", "DUPLICATE", "CANCELLED",
                   "CREDIT_NOT_PROCESSED", "RECURRING_CANCELLED"}
+
+# Per-category strength weights for reason-aware scoring.
+_CATEGORY_WEIGHTS = {
+    "transaction": 0.20,
+    "customer": 0.15,
+    "device": 0.20,
+    "authentication": 0.25,
+    "delivery": 0.10,
+    "ml_risk": 0.10,
+}
 
 
 class ResponseGenerator:
@@ -53,21 +65,74 @@ class ResponseGenerator:
         }
 
     def _recommend(self, case: dict, evidence: dict, strength: float) -> str:
-        """Decide whether to accept, contest, or request more info."""
-        reason = case.get("reason_code", "")
+        """Decide whether to accept, contest, or request more info.
 
-        # Strong evidence + fraud reason -> contest.
-        if reason in CONTEST_REASONS and strength >= 0.5:
-            return "CONTEST"
-        # Fraud reason but weak evidence -> request more info.
+        Uses the top 3 evidence categories from REASON_PRIORITY for the
+        chargeback reason code, and checks ml_risk direction explicitly
+        (low risk supports contest; high risk supports accept/investigate).
+        """
+        reason = case.get("reason_code", "")
+        priority_cats = REASON_PRIORITY.get(reason, ["transaction", "customer", "device"])
+
+        # Build a reason-relevant score from the top-priority categories.
+        top3 = priority_cats[:3]
+        reason_score = 0.0
+        reason_weight = 0.0
+        for cat in top3:
+            cat_data = evidence.get(cat, {})
+            w = _CATEGORY_WEIGHTS.get(cat, 0.1)
+            if cat == "ml_risk":
+                if cat_data.get("available"):
+                    # Low fraud score = strong evidence FOR the merchant (supports contest).
+                    # High fraud score = evidence AGAINST contesting.
+                    risk = float(cat_data.get("risk_score", 0.5) or 0.5)
+                    reason_score += (1.0 - risk) * w
+                else:
+                    reason_score += 0.5 * w  # unknown — neutral
+            elif cat == "authentication":
+                auth = cat_data.get("auth_strength", "unknown")
+                reason_score += {"strong": 0.9, "moderate": 0.5, "weak": 0.2}.get(auth, 0.3) * w
+            elif cat == "device":
+                known = sum(1 for k in ("device_known", "ip_known") if cat_data.get(k))
+                reason_score += [0.0, 0.4, 0.8][known] * w
+            elif cat == "delivery":
+                # Delivery evidence is a stub — treat as low confidence.
+                reason_score += 0.05 * w
+            elif cat == "transaction":
+                reason_score += (0.8 if cat_data.get("transaction_id") else 0.0) * w
+            elif cat == "customer":
+                reason_score += (0.7 if cat_data.get("cardholder") else 0.0) * w
+            else:
+                reason_score += 0.3 * w
+            reason_weight += w
+
+        if reason_weight > 0:
+            reason_score = reason_score / reason_weight
+
+        # --- Decision logic ---
         if reason in CONTEST_REASONS:
+            # For fraud claims: contest if reason-relevant evidence is strong
+            # AND ML risk is low (transaction looks legitimate).
+            ml_risk = evidence.get("ml_risk", {})
+            ml_score = ml_risk.get("risk_score")
+            ml_high = ml_risk.get("available") and ml_score is not None and float(ml_score) > 0.7
+
+            if ml_high:
+                # High ML fraud risk argues AGAINST contesting.
+                return "REQUEST_MORE_INFO"
+            if reason_score >= 0.5:
+                return "CONTEST"
             return "REQUEST_MORE_INFO"
-        # Service reasons with strong evidence -> accept.
-        if reason in ACCEPT_REASONS and strength >= 0.5:
-            return "ACCEPT"
-        # Service reasons with weak evidence -> request more info.
+
         if reason in ACCEPT_REASONS:
-            return "REQUEST_MORE_INFO"
+            # For service issues: accept if the dispute is plausible and
+            # evidence doesn't strongly favor the merchant.
+            if reason_score < 0.4:
+                return "ACCEPT"
+            if reason_score >= 0.6:
+                return "REQUEST_MORE_INFO"
+            return "ACCEPT"
+
         return "REQUEST_MORE_INFO"
 
     def _build_narrative(self, case: dict, evidence: dict, recommendation: str) -> str:

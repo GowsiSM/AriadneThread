@@ -35,10 +35,12 @@ class MLPredictor:
         self.preprocessor_path = preprocessor_path or (MODEL_PATH / "preprocessor.pkl")
         self.model = None
         self.preprocessor = None
+        self.customer_freq: dict = {}
+        self.merchant_freq: dict = {}
         self._load()
 
     def _load(self) -> None:
-        """Load model + preprocessor, tolerating missing files (graceful degrade)."""
+        """Load model + preprocessor + frequency lookups, tolerating missing files."""
         try:
             self.model = joblib.load(self.model_path)
             self.preprocessor = joblib.load(self.preprocessor_path)
@@ -47,6 +49,20 @@ class MLPredictor:
             logger.warning("ML model unavailable (%s); predictions will be unavailable", exc)
             self.model = None
             self.preprocessor = None
+
+        # Load frequency lookup tables (optional, improves prediction accuracy).
+        cust_freq_path = MODEL_PATH / "customer_freq.pkl"
+        merch_freq_path = MODEL_PATH / "merchant_freq.pkl"
+        try:
+            self.customer_freq = joblib.load(cust_freq_path)
+            logger.info("Customer frequency lookup loaded (%d entries)", len(self.customer_freq))
+        except Exception:  # noqa: BLE001
+            self.customer_freq = {}
+        try:
+            self.merchant_freq = joblib.load(merch_freq_path)
+            logger.info("Merchant frequency lookup loaded (%d entries)", len(self.merchant_freq))
+        except Exception:  # noqa: BLE001
+            self.merchant_freq = {}
 
     @property
     def available(self) -> bool:
@@ -63,7 +79,7 @@ class MLPredictor:
 
         try:
             df = pd.DataFrame([transaction])
-            df = add_features(df)
+            df = add_features(df, self.customer_freq, self.merchant_freq)
             X = select_features(df)
             X_processed = self.preprocessor.transform(X)
             prob = float(self.model.predict_proba(X_processed)[0][1])

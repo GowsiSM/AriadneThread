@@ -73,6 +73,9 @@ df["customer_frequency"] = (
       .transform("count")
 )
 
+# Save customer frequency lookup for inference-time use.
+customer_freq = df.groupby("cc_num")["cc_num"].count().to_dict()
+
 
 # -----------------------------------
 # 6. MERCHANT FREQUENCY
@@ -82,6 +85,9 @@ df["merchant_frequency"] = (
     df.groupby("merchant")["merchant"]
       .transform("count")
 )
+
+# Save merchant frequency lookup for inference-time use.
+merchant_freq = df.groupby("merchant")["merchant"].count().to_dict()
 
 
 # -----------------------------------
@@ -218,14 +224,28 @@ print("PR-AUC:", pr_auc)
 # 13. SAVE MODEL
 # -----------------------------------
 
+import os
+os.makedirs("models", exist_ok=True)
+
 joblib.dump(
     model,
-    "fraud_model.pkl"
+    "models/fraud_model.pkl"
 )
 
 joblib.dump(
     preprocessor,
-    "preprocessor.pkl"
+    "models/preprocessor.pkl"
 )
 
-print("\nModel saved!")
+joblib.dump(
+    customer_freq,
+    "models/customer_freq.pkl"
+)
+
+joblib.dump(
+    merchant_freq,
+    "models/merchant_freq.pkl"
+)
+
+print("\nModel saved to models/fraud_model.pkl and models/preprocessor.pkl!")
+print("Frequency lookups saved to models/customer_freq.pkl and models/merchant_freq.pkl!")
