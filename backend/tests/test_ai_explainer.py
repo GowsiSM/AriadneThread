@@ -4,7 +4,7 @@ import pytest
 
 os.environ.setdefault("AI_API_KEY", "")
 
-from app.ai_explainer import explain_ring, _template_explanation
+from app.ai_explainer import explain_ring, _template_explanation, template_explanation
 
 
 SAMPLE_RING = {
@@ -26,9 +26,17 @@ def test_template_explanation_is_deterministic_and_grounded():
     assert "cycle" in text1.lower() or "cycle_involvement".replace("_", " ") in text1
 
 
+def test_template_explanation_public_wrapper():
+    result = template_explanation(SAMPLE_RING)
+    assert result["source"] == "template"
+    assert "CAND-000" in result["text"]
+    assert result["error"] is not None
+
+
 @pytest.mark.asyncio
 async def test_explain_ring_falls_back_without_api_key(monkeypatch):
-    monkeypatch.setattr("app.ai_explainer.AI_API_KEY", "")
+    monkeypatch.delenv("AI_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     result = await explain_ring(SAMPLE_RING)
     assert result["source"] == "template"
     assert result["error"] is not None
@@ -37,7 +45,8 @@ async def test_explain_ring_falls_back_without_api_key(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_explain_ring_falls_back_on_network_error(monkeypatch):
-    monkeypatch.setattr("app.ai_explainer.AI_API_KEY", "fake-key-for-test")
+    monkeypatch.setenv("AI_API_KEY", "fake-key-for-test")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
 
     class BoomClient:
         async def __aenter__(self):

@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 from dataclasses import asdict
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
@@ -20,6 +21,7 @@ from .graph_engine import TransactionGraph
 from .investigation import CaseManager, CaseStatus, auto_create_cases
 from .versions import DETECTOR_VERSION, DATASET_VERSION, RUN_VERSION, log_versions
 from .ml.predictor import MLPredictor
+from .chargeback import ChargebackCaseManager, EvidenceEngine, ResponseGenerator
 from .websocket_manager import ConnectionManager
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -62,6 +64,9 @@ app.add_middleware(
 manager = ConnectionManager()
 case_manager = CaseManager()
 ml_predictor = MLPredictor()
+case_manager = ChargebackCaseManager()
+evidence_engine = EvidenceEngine(ml_predictor)
+response_generator = ResponseGenerator()
 
 # ---- global in-process state (fine for an MVP single-worker demo) ----
 # Uses the 12-typology synthetic generator (app/synthetic.py) so the live
@@ -514,6 +519,66 @@ async def get_user(user_id: str):
 @app.post("/api/chargeback/predict")
 async def predict_chargeback_risk(transaction: dict):
     return ml_predictor.predict(transaction)
+
+
+@app.get("/api/chargeback/cases")
+async def list_chargeback_cases(status: str | None = None):
+    cases = case_manager.list_cases(status=status)
+    return {"cases": cases, "total": len(cases)}
+
+
+@app.get("/api/chargeback/cases/{case_id}")
+async def get_chargeback_case(case_id: str):
+    case = case_manager.get_case(case_id)
+    if not case:
+        return {"error": "case not found"}
+    return case
+
+
+@app.post("/api/chargeback/cases")
+async def create_chargeback_case(case: dict):
+    created = case_manager.create_case(case)
+    return created
+
+
+@app.get("/api/chargeback/evidence/{case_id}")
+async def get_chargeback_evidence(case_id: str):
+    case = case_manager.get_case(case_id)
+    if not case:
+        return {"error": "case not found"}
+    evidence_result = evidence_engine.collect_evidence(case)
+    # Flatten the prioritized evidence into the array the frontend expects
+    priority_list = evidence_result.get("priority", [])
+    evidence_items = []
+    for item in priority_list:
+        evidence_items.append({
+            "category": item.get("category", ""),
+            "type": item.get("label", ""),
+            "description": item.get("label", ""),
+            "value": item.get("data", {}),
+            "strength": evidence_result.get("evidence_strength", 0),
+            "collected_at": datetime.now(timezone.utc).isoformat(),
+        })
+    return {"case_id": case_id, "evidence": evidence_items}
+
+
+@app.get("/api/chargeback/response/{case_id}")
+async def get_chargeback_response(case_id: str):
+    case = case_manager.get_case(case_id)
+    if not case:
+        return {"error": "case not found"}
+    evidence_result = evidence_engine.collect_evidence(case)
+    response = response_generator.generate_response(case, evidence_result)
+    return {"case_id": case_id, "response": response}
+
+
+@app.post("/api/chargeback/cases/{case_id}/status")
+async def update_chargeback_status(case_id: str, body: dict):
+    new_status = body.get("status", "")
+    updated = case_manager.update_status(case_id, new_status)
+    if not updated:
+        return {"error": "case not found or invalid status"}
+    return updated
 
 
 @app.websocket("/ws/stream")

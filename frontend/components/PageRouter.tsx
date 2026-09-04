@@ -12,6 +12,8 @@ import MetricsPage from "@/components/pages/MetricsPage";
 import InvestigationPage from "@/components/pages/InvestigationPage";
 import EvaluationPage from "@/components/pages/EvaluationPage";
 import VersionsPage from "@/components/pages/VersionsPage";
+import ChargebackPage from "@/components/pages/ChargebackPage";
+import ChargebackCasePage from "@/components/pages/ChargebackCasePage";
 import { useSentinelData } from "@/lib/SentinelDataProvider";
 
 export default function PageRouter() {
@@ -22,6 +24,12 @@ export default function PageRouter() {
   if (pathname.startsWith("/rings/")) {
     const ringId = pathname.split("/rings/")[1];
     return <RingDetailPage ringId={ringId} />;
+  }
+
+  // Chargeback case detail: /chargebacks/[id]
+  if (pathname.startsWith("/chargebacks/")) {
+    const caseId = pathname.split("/chargebacks/")[1];
+    return <ChargebackCasePage caseId={caseId} />;
   }
 
   switch (pathname) {
@@ -43,6 +51,8 @@ export default function PageRouter() {
       return <EvaluationPage />;
     case "/versions":
       return <VersionsPage />;
+    case "/chargebacks":
+      return <ChargebackPage />;
     default:
       return (
         <DashboardPage

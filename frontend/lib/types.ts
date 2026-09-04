@@ -178,6 +178,57 @@ export interface CaseSummary {
 }
 
 // ---------------------------------------------------------------------------
+// Chargeback Evidence Responder
+// ---------------------------------------------------------------------------
+
+export type ChargebackStatus = "OPEN" | "UNDER_REVIEW" | "RESPONDED" | "CLOSED";
+export type ChargebackPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+export interface ChargebackCase {
+  case_id: string;
+  transaction_id: string;
+  cardholder_id: string;
+  merchant_id: string;
+  amount: number;
+  currency: string;
+  reason_code: string;
+  reason_description: string;
+  filed_at: string;
+  status: ChargebackStatus;
+  priority: ChargebackPriority;
+  is_fraud: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EvidenceItem {
+  category: string;
+  type: string;
+  description: string;
+  value: unknown;
+  strength: number;
+  collected_at: string;
+}
+
+export interface ChargebackResponse {
+  case_id: string;
+  recommendation: "CONTEST" | "ACCEPT" | "REQUEST_MORE_INFO";
+  confidence: number;
+  evidence_summary: string;
+  response_text: string;
+  evidence_count: number;
+  strong_evidence_count: number;
+  generated_at: string;
+}
+
+export interface ChargebackPrediction {
+  risk_score: number;
+  risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  available: boolean;
+  explanation: string;
+}
+
+// ---------------------------------------------------------------------------
 // Stage 5: Versions
 // ---------------------------------------------------------------------------
 

@@ -39,6 +39,7 @@ const sections: NavSection[] = [
     title: "Operations",
     items: [
       { label: "Investigations", href: "/investigation", icon: "◫" },
+      { label: "Chargebacks", href: "/chargebacks", icon: "⟳" },
       { label: "Evaluation", href: "/evaluation", icon: "▤" },
       { label: "Versions", href: "/versions", icon: "⌬" },
     ],

@@ -11,3 +11,8 @@ pytest==8.3.3
 pytest-asyncio==0.24.0
 websockets==13.1
 scipy
+# --- ML chargeback predictor (optional; app degrades gracefully if absent) ---
+xgboost
+scikit-learn
+pandas
+joblib

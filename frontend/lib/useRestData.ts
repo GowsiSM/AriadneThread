@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import type { InvestigationCase, CaseSummary, VersionInfo } from "@/lib/types";
+import type {
+  InvestigationCase,
+  CaseSummary,
+  VersionInfo,
+  ChargebackCase,
+  EvidenceItem,
+  ChargebackResponse,
+} from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -148,4 +155,117 @@ export async function assignCase(caseId: string, analyst: string) {
     throw new Error(data.error || `HTTP ${res.status}`);
   }
   return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Chargeback Evidence Responder
+// ---------------------------------------------------------------------------
+
+export function useChargebackCases(pollMs = 5000) {
+  const [cases, setCases] = useState<ChargebackCase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/chargeback/cases`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setCases(data.cases ?? []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load chargeback cases");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, pollMs);
+    return () => clearInterval(id);
+  }, [refresh, pollMs]);
+
+  return { cases, loading, error, refresh };
+}
+
+export function useChargebackCase(caseId: string | null) {
+  const [caseData, setCaseData] = useState<ChargebackCase | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!caseId) return;
+    try {
+      const res = await fetch(`${API_URL}/api/chargeback/cases/${caseId}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setCaseData(data.error ? null : data);
+      setError(data.error ?? null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load case");
+    } finally {
+      setLoading(false);
+    }
+  }, [caseId]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { caseData, loading, error, refresh };
+}
+
+export function useChargebackEvidence(caseId: string | null) {
+  const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!caseId) return;
+    try {
+      const res = await fetch(`${API_URL}/api/chargeback/evidence/${caseId}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setEvidence(data.evidence ?? []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load evidence");
+    } finally {
+      setLoading(false);
+    }
+  }, [caseId]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { evidence, loading, error, refresh };
+}
+
+export function useChargebackResponse(caseId: string | null) {
+  const [response, setResponse] = useState<ChargebackResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!caseId) return;
+    try {
+      const res = await fetch(`${API_URL}/api/chargeback/response/${caseId}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setResponse(data.response ?? null);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load response");
+    } finally {
+      setLoading(false);
+    }
+  }, [caseId]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { response, loading, error, refresh };
 }
