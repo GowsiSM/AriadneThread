@@ -116,11 +116,11 @@ export default function ChargebackCasePage({ caseId }: { caseId: string }) {
           </StatusBadge>
         </InfoCard>
         <InfoCard label="Amount">
-          {formatCurrency(caseData.amount, caseData.currency)}
+          {formatCurrency(caseData.amount, caseData.currency ?? "INR")}
         </InfoCard>
         <InfoCard label="Reason Code">{caseData.reason_code}</InfoCard>
-        <InfoCard label="Cardholder">{caseData.cardholder_id}</InfoCard>
-        <InfoCard label="Merchant">{caseData.merchant_id}</InfoCard>
+        <InfoCard label="Cardholder">{caseData.cardholder}</InfoCard>
+        <InfoCard label="Merchant">{caseData.merchant}</InfoCard>
         <InfoCard label="Filed">{formatDate(caseData.filed_at)}</InfoCard>
         <InfoCard label="Transaction">{caseData.transaction_id}</InfoCard>
         <InfoCard label="Fraud Flag">
@@ -146,13 +146,13 @@ export default function ChargebackCasePage({ caseId }: { caseId: string }) {
               {response.recommendation}
             </StatusBadge>
             <span className="text-xs text-fg-muted">
-              Confidence: {Math.round(response.confidence * 100)}%
+              Evidence strength: {Math.round(response.evidence_strength * 100)}%
             </span>
             <span className="text-xs text-fg-muted">
-              {response.strong_evidence_count}/{response.evidence_count} strong evidence
+              {response.evidence?.length ?? 0} evidence items
             </span>
           </div>
-          <p className="mt-2 text-xs text-fg-secondary">{response.response_text}</p>
+          <p className="mt-2 text-xs text-fg-secondary">{response.narrative}</p>
         </div>
       )}
 

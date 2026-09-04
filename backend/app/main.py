@@ -55,7 +55,7 @@ FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 app = FastAPI(title="AriadneThread API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_ORIGIN, "*"],
+    allow_origins=[FRONTEND_ORIGIN, "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,7 +64,7 @@ app.add_middleware(
 manager = ConnectionManager()
 case_manager = CaseManager()
 ml_predictor = MLPredictor()
-case_manager = ChargebackCaseManager()
+chargeback_manager = ChargebackCaseManager()
 evidence_engine = EvidenceEngine(ml_predictor)
 response_generator = ResponseGenerator()
 
@@ -523,13 +523,13 @@ async def predict_chargeback_risk(transaction: dict):
 
 @app.get("/api/chargeback/cases")
 async def list_chargeback_cases(status: str | None = None):
-    cases = case_manager.list_cases(status=status)
+    cases = chargeback_manager.list_cases(status=status)
     return {"cases": cases, "total": len(cases)}
 
 
 @app.get("/api/chargeback/cases/{case_id}")
 async def get_chargeback_case(case_id: str):
-    case = case_manager.get_case(case_id)
+    case = chargeback_manager.get_case(case_id)
     if not case:
         return {"error": "case not found"}
     return case
@@ -537,13 +537,13 @@ async def get_chargeback_case(case_id: str):
 
 @app.post("/api/chargeback/cases")
 async def create_chargeback_case(case: dict):
-    created = case_manager.create_case(case)
+    created = chargeback_manager.create_case(case)
     return created
 
 
 @app.get("/api/chargeback/evidence/{case_id}")
 async def get_chargeback_evidence(case_id: str):
-    case = case_manager.get_case(case_id)
+    case = chargeback_manager.get_case(case_id)
     if not case:
         return {"error": "case not found"}
     evidence_result = evidence_engine.collect_evidence(case)
@@ -564,7 +564,7 @@ async def get_chargeback_evidence(case_id: str):
 
 @app.get("/api/chargeback/response/{case_id}")
 async def get_chargeback_response(case_id: str):
-    case = case_manager.get_case(case_id)
+    case = chargeback_manager.get_case(case_id)
     if not case:
         return {"error": "case not found"}
     evidence_result = evidence_engine.collect_evidence(case)
@@ -575,7 +575,7 @@ async def get_chargeback_response(case_id: str):
 @app.post("/api/chargeback/cases/{case_id}/status")
 async def update_chargeback_status(case_id: str, body: dict):
     new_status = body.get("status", "")
-    updated = case_manager.update_status(case_id, new_status)
+    updated = chargeback_manager.update_status(case_id, new_status)
     if not updated:
         return {"error": "case not found or invalid status"}
     return updated

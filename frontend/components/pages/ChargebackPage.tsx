@@ -58,8 +58,8 @@ function CaseRow({ c }: { c: ChargebackCase }) {
         </div>
       </div>
       <div className="text-right shrink-0">
-        <div className="text-sm font-medium text-fg">{formatCurrency(c.amount, c.currency)}</div>
-        <div className="text-xs text-fg-muted">{c.merchant_id}</div>
+        <div className="text-sm font-medium text-fg">{formatCurrency(c.amount, c.currency ?? "INR")}</div>
+        <div className="text-xs text-fg-muted">{c.merchant}</div>
       </div>
       {c.is_fraud && (
         <span className="rounded bg-danger/10 px-1.5 py-0.5 text-[10px] font-medium text-danger">

@@ -187,18 +187,17 @@ export type ChargebackPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export interface ChargebackCase {
   case_id: string;
   transaction_id: string;
-  cardholder_id: string;
-  merchant_id: string;
+  cardholder: string;
+  merchant: string;
   amount: number;
-  currency: string;
+  currency?: string;
   reason_code: string;
   reason_description: string;
   filed_at: string;
   status: ChargebackStatus;
   priority: ChargebackPriority;
   is_fraud: boolean;
-  created_at: string;
-  updated_at: string;
+  notes?: Record<string, unknown>[];
 }
 
 export interface EvidenceItem {
@@ -211,13 +210,12 @@ export interface EvidenceItem {
 }
 
 export interface ChargebackResponse {
+  response_id: string;
   case_id: string;
   recommendation: "CONTEST" | "ACCEPT" | "REQUEST_MORE_INFO";
-  confidence: number;
-  evidence_summary: string;
-  response_text: string;
-  evidence_count: number;
-  strong_evidence_count: number;
+  narrative: string;
+  evidence: EvidenceItem[];
+  evidence_strength: number;
   generated_at: string;
 }
 

@@ -119,6 +119,40 @@ export default function GraphAnalysisView({
       if (sim.alpha() < sim.alphaMin() || tickCount > 150) {
         clearInterval(timerRef.current!);
         timerRef.current = null;
+        // Auto-fit after simulation settles so all nodes are visible
+        requestAnimationFrame(() => {
+          if (svgRef.current && zoomBehaviorRef.current && nodeArr.length > 0) {
+            const svgEl = svgRef.current;
+            const bbox = svgEl.getBoundingClientRect();
+            const svgWidth = bbox.width || WIDTH;
+            const svgHeight = bbox.height || HEIGHT;
+
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const n of nodeArr) {
+              if (n.x == null || n.y == null) continue;
+              if (n.x < minX) minX = n.x;
+              if (n.y < minY) minY = n.y;
+              if (n.x > maxX) maxX = n.x;
+              if (n.y > maxY) maxY = n.y;
+            }
+            if (minX === Infinity) return;
+
+            const graphWidth = maxX - minX || 1;
+            const graphHeight = maxY - minY || 1;
+            const graphCx = (minX + maxX) / 2;
+            const graphCy = (minY + maxY) / 2;
+
+            const scaleX = (svgWidth - PADDING * 2) / graphWidth;
+            const scaleY = (svgHeight - PADDING * 2) / graphHeight;
+            const scale = Math.min(scaleX, scaleY, 3);
+
+            const tx = svgWidth / 2 - graphCx * scale;
+            const ty = svgHeight / 2 - graphCy * scale;
+
+            const t = zoomIdentity.translate(tx, ty).scale(scale);
+            zoomBehaviorRef.current.transform(select(svgRef.current), t);
+          }
+        });
         return;
       }
       sim.tick();

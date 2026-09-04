@@ -12,7 +12,14 @@ export default function TransactionsPage({
   recentTx: TxMessage[];
   alerts: RingAlert[];
 }) {
-  const flaggedIds = new Set(alerts.flatMap((a) => a.ring.members));
+  // Combine detected ring members with ground-truth fraud users (F-prefixed)
+  // for consistent red highlighting from stream start
+  const flaggedIds = new Set([
+    ...alerts.flatMap((a) => a.ring.members),
+  ]);
+
+  // Helper: check if a user ID is a ground-truth fraud ring member (F-prefixed)
+  const isFraudUser = (id: string) => /^F\d{4}$/.test(id);
 
   return (
     <div className="flex flex-col gap-6">
@@ -53,12 +60,12 @@ export default function TransactionsPage({
                     >
                       <td className="px-4 py-2.5 mono-data text-xs text-fg-secondary">{tx.tx_id}</td>
                       <td className="px-4 py-2.5 mono-data text-xs">
-                        <span className={flaggedIds.has(tx.sender) ? "text-danger" : "text-fg-secondary"}>
+                        <span className={flaggedIds.has(tx.sender) || isFraudUser(tx.sender) ? "text-danger" : "text-fg-secondary"}>
                           {tx.sender}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 mono-data text-xs">
-                        <span className={flaggedIds.has(tx.receiver) ? "text-danger" : "text-fg-secondary"}>
+                        <span className={flaggedIds.has(tx.receiver) || isFraudUser(tx.receiver) ? "text-danger" : "text-fg-secondary"}>
                           {tx.receiver}
                         </span>
                       </td>
