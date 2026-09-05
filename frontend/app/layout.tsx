@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import ThemeProvider from "@/lib/ThemeProvider";
 
-const inter = Inter({
-  subsets: ["latin"],
+// Self-hosted fonts (no network fetch at build time, so `npm run build`
+// works in offline/CI environments).
+const inter = localFont({
+  src: "./fonts/inter-latin.woff2",
   variable: "--font-sans",
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
+const jetbrainsMono = localFont({
+  src: "./fonts/jetbrains-mono-latin.woff2",
   variable: "--font-mono",
   display: "swap",
 });

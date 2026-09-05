@@ -88,7 +88,7 @@ def _synthesize_fraud_explanation(ring: dict) -> str:
 
     if motifs:
         motif_names = sorted({
-            (m.get("motif_type") or m.motif_type if hasattr(m, "motif_type") else "").replace("_", " ")
+            ((m.get("motif_type") if isinstance(m, dict) else getattr(m, "motif_type", None)) or "").replace("_", " ")
             for m in motifs
             if (m.get("motif_type") if isinstance(m, dict) else getattr(m, "motif_type", None))
         })

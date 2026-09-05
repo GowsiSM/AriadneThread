@@ -77,20 +77,23 @@ class CasePriority(str, enum.Enum):
 def compute_priority(score: float, n_members: int, typology: str | None) -> CasePriority:
     """Deterministic priority from detection metadata.
 
-    Priority rules:
-      - score >= 80 OR (typology in high_risk AND score >= 65) -> CRITICAL
-      - score >= 65 OR n_members >= 10 -> HIGH
-      - score >= 55 -> MEDIUM
+    Priority bands are rebased relative to the detection flag threshold
+    (SCORE_THRESHOLD = 40.0 in app/main.py), so that a ring strong enough to
+    be flagged at all can still be ranked meaningfully:
+
+      - score >= 70 OR (typology in high_risk AND score >= 65) -> CRITICAL
+      - score >= 55 OR n_members >= 10 -> HIGH
+      - score >= 45 -> MEDIUM
       - else -> LOW
     """
     high_risk_typologies = {"circular", "layering", "mule_chain", "smurfing"}
     is_high_risk_typology = typology in high_risk_typologies if typology else False
 
-    if score >= 80 or (is_high_risk_typology and score >= 65):
+    if score >= 70 or (is_high_risk_typology and score >= 65):
         return CasePriority.CRITICAL
-    if score >= 65 or n_members >= 10:
+    if score >= 55 or n_members >= 10:
         return CasePriority.HIGH
-    if score >= 55:
+    if score >= 45:
         return CasePriority.MEDIUM
     return CasePriority.LOW
 

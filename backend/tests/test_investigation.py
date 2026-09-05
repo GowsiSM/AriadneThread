@@ -123,20 +123,20 @@ class TestPriority:
         assert compute_priority(70.0, 5, "layering") == CasePriority.CRITICAL
 
     def test_high_score(self):
-        assert compute_priority(70.0, 5, "fan_in") == CasePriority.HIGH
+            assert compute_priority(60.0, 5, "fan_in") == CasePriority.HIGH
 
     def test_high_member_count(self):
         assert compute_priority(60.0, 12, None) == CasePriority.HIGH
 
     def test_medium(self):
-        assert compute_priority(58.0, 5, None) == CasePriority.MEDIUM
+        assert compute_priority(50.0, 5, None) == CasePriority.MEDIUM
 
     def test_low(self):
-        assert compute_priority(50.0, 3, None) == CasePriority.LOW
+        assert compute_priority(42.0, 3, None) == CasePriority.LOW
 
     def test_high_risk_typology_below_threshold_is_not_critical(self):
-        # score 60 < 65, so not CRITICAL and not HIGH -> MEDIUM
-        assert compute_priority(60.0, 5, "circular") == CasePriority.MEDIUM
+        # score 50 < 65, so not CRITICAL and not HIGH -> MEDIUM
+        assert compute_priority(50.0, 5, "circular") == CasePriority.MEDIUM
 
 
 # ---------------------------------------------------------------------------
