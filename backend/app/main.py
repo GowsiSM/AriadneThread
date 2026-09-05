@@ -90,17 +90,19 @@ stream_stats = {"emitted": 0, "total": len(transactions), "started": False, "don
 # the stream finishes still has data to render (graph + transactions pages).
 RECENT_TX_LIMIT = 200
 recent_tx: list[dict] = []
+latest_alerts: dict[str, dict] = {}
 _stream_task: asyncio.Task | None = None
 
 
 def _reset_stream_state():
     """Reset all in-process stream state so a fresh replay starts clean."""
-    global tx_graph, latest_candidates, latest_metrics, latest_fairness, tx_value_by_user, stream_stats, recent_tx
+    global tx_graph, latest_candidates, latest_metrics, latest_fairness, tx_value_by_user, stream_stats, recent_tx, latest_alerts
     tx_graph = TransactionGraph()
     latest_candidates = []
     latest_metrics = {}
     latest_fairness = {}
     tx_value_by_user = {}
+    latest_alerts = {}
     stream_stats = {"emitted": 0, "total": len(transactions), "started": False, "done": False}
     recent_tx = []
 
@@ -168,14 +170,20 @@ async def _run_detection_and_broadcast():
     flagged = [c for c in candidates if c.score >= SCORE_THRESHOLD][:5]
     for cand in flagged:
         cd = _candidate_to_dict(cand)
-        # During streaming, use template explanations to avoid API calls.
-        # AI explanations are generated after the stream completes.
+        # During streaming, use synthesized explanations to avoid API bottlenecks.
+        # AI explanations are refreshed after the stream completes.
         if stream_stats["done"]:
             explanation = await explain_ring(cd)
         else:
             explanation = template_explanation(cd)
         blast = compute_blast_radius(cand, user_index, tx_value_by_user)
         blast_d = asdict(blast)
+        latest_alerts[cand.ring_id] = {
+            "ring": cd,
+            "explanation": explanation,
+            "blast_radius": blast_d,
+            "receivedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+        }
         db.save_ring(cd, explanation, blast_d)
         db.log_audit("ring_flagged", {
             "ring_id": cand.ring_id, "score": cand.score,
@@ -216,7 +224,7 @@ async def _generate_ai_explanations():
     """Generate AI explanations for all flagged rings after the stream completes.
     
     This is called once after the entire transaction stream has been processed.
-    It replaces the template explanations with AI-generated explanations and
+    It replaces the streaming explanations with full AI-generated explanations and
     broadcasts the updates to connected clients.
     """
     global latest_candidates
@@ -234,6 +242,12 @@ async def _generate_ai_explanations():
         blast = compute_blast_radius(cand, user_index, tx_value_by_user)
         blast_d = asdict(blast)
         
+        latest_alerts[cand.ring_id] = {
+            "ring": cd,
+            "explanation": explanation,
+            "blast_radius": blast_d,
+            "receivedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+        }
         # Update the stored ring with the new AI explanation
         db.save_ring(cd, explanation, blast_d)
         
@@ -323,17 +337,52 @@ async def get_rings():
 
 @app.get("/api/rings/{ring_id}")
 async def get_ring(ring_id: str):
+    if ring_id in latest_alerts:
+        return latest_alerts[ring_id]
     for c in latest_candidates:
         if c.ring_id == ring_id:
             cd = _candidate_to_dict(c)
-            # Use template explanation during streaming, AI explanation after stream completes
             if stream_stats["done"]:
                 explanation = await explain_ring(cd)
             else:
                 explanation = template_explanation(cd)
             blast = compute_blast_radius(c, user_index, tx_value_by_user)
-            return {"ring": cd, "explanation": explanation, "blast_radius": asdict(blast)}
+            blast_d = asdict(blast)
+            alert = {
+                "ring": cd,
+                "explanation": explanation,
+                "blast_radius": blast_d,
+                "receivedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+            }
+            latest_alerts[ring_id] = alert
+            return alert
     return {"error": "not found"}
+
+
+@app.post("/api/rings/{ring_id}/explain")
+async def regenerate_ring_explanation(ring_id: str):
+    """Regenerate an AI explanation on-demand for a specific ring."""
+    for c in latest_candidates:
+        if c.ring_id == ring_id:
+            cd = _candidate_to_dict(c)
+            explanation = await explain_ring(cd, force_refresh=True)
+            blast = compute_blast_radius(c, user_index, tx_value_by_user)
+            blast_d = asdict(blast)
+            alert = {
+                "ring": cd,
+                "explanation": explanation,
+                "blast_radius": blast_d,
+                "receivedAt": int(datetime.now(timezone.utc).timestamp() * 1000),
+            }
+            latest_alerts[ring_id] = alert
+            db.save_ring(cd, explanation, blast_d)
+            await manager.broadcast({
+                "type": "explanation_update",
+                "ring_id": ring_id,
+                "explanation": explanation,
+            })
+            return alert
+    return {"error": "ring not found"}
 
 
 @app.get("/api/metrics")
@@ -634,6 +683,7 @@ async def ws_stream(ws: WebSocket):
         await ws.send_json({
             "type": "snapshot",
             "rings": [_candidate_to_dict(c) for c in latest_candidates],
+            "alerts": list(latest_alerts.values()),
             "metrics": latest_metrics,
             "fairness": latest_fairness,
             "stream": stream_stats,

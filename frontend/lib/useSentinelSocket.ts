@@ -109,25 +109,29 @@ export function useSentinelSocket() {
           if (msg.recent_tx && msg.recent_tx.length > 0) {
             setRecentTx(msg.recent_tx.slice(0, RECENT_TX_BUFFER));
           }
-          setAlerts(
-            msg.rings
-              .filter((r) => r.score >= (msg.metrics?.threshold ?? 40))
-              .map((r) => ({
-                ring: r,
-                explanation: { text: "(loaded from snapshot)", source: "template", error: null },
-                blast_radius: {
-                  ring_id: r.ring_id,
-                  total_members: r.members.length,
-                  likely_innocent: 0,
-                  innocent_ratio: 0,
-                  txn_volume_last_window: 0,
-                  value_at_risk_inr: 0,
-                  dominant_cohorts: [],
-                  recommendation: "",
-                },
-                receivedAt: Date.now(),
-              }))
-          );
+          if (msg.alerts && msg.alerts.length > 0) {
+                      setAlerts(msg.alerts);
+                    } else {
+                      setAlerts(
+                        msg.rings
+                          .filter((r) => r.score >= (msg.metrics?.threshold ?? 40))
+                          .map((r) => ({
+                            ring: r,
+                            explanation: { text: "(loaded from snapshot)", source: "template", error: null },
+                            blast_radius: {
+                              ring_id: r.ring_id,
+                              total_members: r.members.length,
+                              likely_innocent: 0,
+                              innocent_ratio: 0,
+                              txn_volume_last_window: 0,
+                              value_at_risk_inr: 0,
+                              dominant_cohorts: [],
+                              recommendation: "",
+                            },
+                            receivedAt: Date.now(),
+                          }))
+                      );
+                    }
           break;
         }
         case "transaction": {

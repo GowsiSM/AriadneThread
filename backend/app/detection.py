@@ -181,7 +181,9 @@ def detect_communities(shared_g: nx.Graph, tx_g_undirected: nx.Graph) -> list[se
     groups: dict[int, set[str]] = {}
     for node, comm_id in partition.items():
         groups.setdefault(comm_id, set()).add(node)
-    return [members for members in groups.values() if len(members) >= 3]
+    valid_groups = [members for members in groups.values() if len(members) >= 3]
+    valid_groups.sort(key=lambda m: sorted(m))
+    return valid_groups
 
 
 def score_candidate(
@@ -277,5 +279,5 @@ def run_detection(
         if cand.score >= score_threshold:
             already_flagged.update(members)
 
-    candidates.sort(key=lambda c: c.score, reverse=True)
+    candidates.sort(key=lambda c: (-c.score, c.ring_id))
     return candidates

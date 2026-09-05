@@ -110,7 +110,7 @@ export interface StreamStats {
 }
 
 export type ServerMessage =
-  | { type: "snapshot"; rings: RingPayload[]; metrics: Metrics; fairness: { cohorts: CohortStat[] }; stream: StreamStats; recent_tx?: TxMessage[] }
+  | { type: "snapshot"; rings: RingPayload[]; alerts?: RingAlert[]; metrics: Metrics; fairness: { cohorts: CohortStat[] }; stream: StreamStats; recent_tx?: TxMessage[] }
   | { type: "transaction"; tx: TxMessage }
   | { type: "ring_alert"; ring: RingPayload; explanation: Explanation; blast_radius: BlastRadius }
   | { type: "explanation_update"; ring_id: string; explanation: Explanation }

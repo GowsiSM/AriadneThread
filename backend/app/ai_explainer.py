@@ -49,46 +49,98 @@ def _get_gemini_config() -> tuple[str, str]:
     return key, model
 
 
-def _template_explanation(ring: dict) -> str:
-    top = sorted(ring["signals"], key=lambda s: s["weight"] * s["value"], reverse=True)
-    lead = top[0]
+def _synthesize_fraud_explanation(ring: dict) -> str:
+    """Generate an authoritative, articulate fraud intelligence explanation
+    synthesizing graph signals, typologies, flow dynamics, roles, and motifs.
+    """
+    signals = ring.get("signals", [])
+    top = sorted(signals, key=lambda s: s.get("weight", 0) * s.get("value", 0), reverse=True)
+    lead = top[0] if top else {"name": "risk signals", "detail": "elevated anomaly score"}
     second = top[1] if len(top) > 1 else None
-    size = len(ring["members"])
+    size = len(ring.get("members", []))
+    score = ring.get("score", 0.0)
+    typology = ring.get("typology")
+    flow = ring.get("flow_summary")
+    motifs = ring.get("motifs", [])
+    roles = ring.get("roles", [])
+
+    typology_str = f" exhibiting a {typology.replace('_', ' ')} typology pattern" if typology else ""
     parts = [
-        f"Ring {ring['ring_id']} ({size} accounts, risk score {ring['score']}/100) "
-        f"was flagged primarily on {lead['name'].replace('_', ' ')}: {lead['detail']}."
+        f"Ring {ring.get('ring_id', 'CAND')} comprises {size} coordinated accounts flagged with a risk score of {score}/100{typology_str}."
     ]
+
+    lead_name = lead["name"].replace("_", " ")
+    parts.append(f"Primary risk driver is {lead_name}: {lead.get('detail', '')}.")
     if second:
-        parts.append(f"Secondary signal -- {second['name'].replace('_', ' ')}: {second['detail']}.")
-    parts.append("[templated explanation -- AI explainer unavailable, showing raw signal summary]")
+        sec_name = second["name"].replace("_", " ")
+        parts.append(f"Secondary compounding indicator is {sec_name}: {second.get('detail', '')}.")
+
+    if flow and isinstance(flow, dict):
+        int_vol = flow.get("internal_volume", 0)
+        ratio = flow.get("flow_ratio", 0)
+        dom_path = flow.get("dominant_path", [])
+        if int_vol > 0 or ratio > 0:
+            flow_desc = f"Internal money flow reached ₹{int_vol:,.2f} with a flow ratio of {ratio:.2f}"
+            if dom_path and len(dom_path) >= 2:
+                flow_desc += f", with velocity concentrated on {' → '.join(dom_path)}"
+            flow_desc += "."
+            parts.append(flow_desc)
+
+    if motifs:
+        motif_names = sorted({
+            (m.get("motif_type") or m.motif_type if hasattr(m, "motif_type") else "").replace("_", " ")
+            for m in motifs
+            if (m.get("motif_type") if isinstance(m, dict) else getattr(m, "motif_type", None))
+        })
+        if motif_names:
+            parts.append(f"Detected graph motifs include: {', '.join(motif_names)}.")
+
+    if roles:
+        role_map = {}
+        for r in roles:
+            role_name = r.get("role") if isinstance(r, dict) else getattr(r, "role", "")
+            user_id = r.get("user_id") if isinstance(r, dict) else getattr(r, "user_id", "")
+            if role_name and user_id:
+                role_map.setdefault(role_name, []).append(user_id)
+        role_highlights = []
+        for role_name, members in role_map.items():
+            if role_name in ("intermediary", "aggregator", "source", "mule"):
+                role_highlights.append(f"{role_name.replace('_', ' ')} ({', '.join(members[:3])})")
+        if role_highlights:
+            parts.append(f"Key identified account roles: {'; '.join(role_highlights)}.")
+
     return " ".join(parts)
 
 
+def _template_explanation(ring: dict) -> str:
+    return _synthesize_fraud_explanation(ring)
+
+
 def template_explanation(ring: dict) -> dict:
-    """Public wrapper that returns the standard explanation dict with a template.
-    
-    Used during streaming to avoid API calls; AI explanations are generated
-    after the stream completes.
-    """
-    text = _template_explanation(ring)
+    """Public wrapper that returns the standard explanation dict with a synthesized explanation."""
+    text = _synthesize_fraud_explanation(ring)
     return {"text": text, "source": "template", "error": "AI explanations deferred until stream completes"}
 
 
 def _build_prompt(ring: dict) -> str:
-    return (
+    prompt_lines = [
         "You are explaining a fraud-ring detection result to a human fraud-ops "
         "reviewer. You are NOT deciding whether to act on it -- only explaining "
         "the already-computed signals in 2-3 plain English sentences, grounded "
-        "strictly in the data given. Do not invent details.\n\n"
-        f"Ring ID: {ring['ring_id']}\n"
-        f"Member count: {len(ring['members'])}\n"
-        f"Risk score (0-100, deterministic): {ring['score']}\n"
-        "Signals:\n"
-        + "\n".join(
-            f"- {s['name']} (weight {s['weight']}, value {s['value']:.2f}): {s['detail']}"
-            for s in ring["signals"]
-        )
-    )
+        "strictly in the data given. Do not invent details.\n",
+        f"Ring ID: {ring['ring_id']}",
+        f"Member count: {len(ring['members'])}",
+        f"Risk score (0-100, deterministic): {ring['score']}",
+    ]
+    if ring.get("typology"):
+        prompt_lines.append(f"Detected Typology: {ring['typology']}")
+    prompt_lines.append("Signals:")
+    for s in ring.get("signals", []):
+        prompt_lines.append(f"- {s['name']} (weight {s['weight']}, value {s['value']:.2f}): {s['detail']}")
+    if ring.get("flow_summary") and isinstance(ring["flow_summary"], dict):
+        f_s = ring["flow_summary"]
+        prompt_lines.append(f"Money Flow: internal={f_s.get('internal_volume', 0):.2f}, ratio={f_s.get('flow_ratio', 0):.2f}, path={f_s.get('dominant_path', [])}")
+    return "\n".join(prompt_lines)
 
 
 async def _gemini_explanation(ring: dict) -> dict:
@@ -176,10 +228,10 @@ async def _openai_explanation(ring: dict) -> dict:
         return {"text": _template_explanation(ring), "source": "template", "error": str(exc)}
 
 
-async def explain_ring(ring: dict) -> dict:
+async def explain_ring(ring: dict, force_refresh: bool = False) -> dict:
     """Returns {"text": str, "source": "ai"|"template", "error": str|None}."""
     cache_key = f"{ring.get('ring_id')}_{ring.get('score')}"
-    if cache_key in _explanation_cache and _explanation_cache[cache_key].get("source") == "ai":
+    if not force_refresh and cache_key in _explanation_cache and _explanation_cache[cache_key].get("source") == "ai":
         return _explanation_cache[cache_key]
 
     gemini_key, _ = _get_gemini_config()
