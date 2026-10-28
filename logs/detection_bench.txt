@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "D:\gowsi\miniproject\AriadneThread\scripts\bench_detection.py", line 2, in <module>
+    from app.synthetic import generate_dataset
+ModuleNotFoundError: No module named 'app'
