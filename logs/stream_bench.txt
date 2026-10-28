@@ -1,0 +1,10 @@
+  200/1282  20.82s  9.6 tx/s
+  400/1282  41.04s  9.7 tx/s
+  600/1282  66.72s  9.0 tx/s
+  800/1282  94.10s  8.5 tx/s
+  1000/1282  116.04s  8.6 tx/s
+  1200/1282  141.08s  8.5 tx/s
+
+DONE: 1282 tx in 154.15s -> 8.32 tx/s effective
+Expected minimum (no detection): 85.5s
+Detection overhead: 68.68s

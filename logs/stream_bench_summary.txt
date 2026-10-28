@@ -1,0 +1,7 @@
+Measured: 2026-10-28
+Stream end-to-end: 1282 tx in 154.15 s = 8.32 tx/s effective
+Configured rate: 15 tx/s -> expected minimum 85.5 s
+Detection overhead: 68.7 s across ~43 detection runs (DETECTION_EVERY_N_EDGES=30)
+Per-detection-run cost (derived): ~1.6 s at ~1282 edges
+Hardware: Intel(R) Core(TM) i5-6200U CPU @ 2.30GHz
+OS: Microsoft Windows 10 Pro
